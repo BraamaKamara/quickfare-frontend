@@ -3,10 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <title>QuickFare Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: Arial; padding: 20px; background-color: #f4f4f4; }
     h1 { color: #333; }
-    .section { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .section {
+      background: #fff;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .input {
+      margin: 5px 0;
+      padding: 5px;
+      width: 250px;
+      display: block;
+    }
+    button { padding: 6px 12px; margin-top: 10px; }
     .entry-box {
       background-color: #fefefe;
       padding: 10px;
@@ -14,8 +28,6 @@
       border: 1px solid #ccc;
       border-left: 5px solid #007BFF;
     }
-    .input { margin: 5px 0; padding: 5px; width: 250px; display: block; }
-    button { padding: 6px 12px; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -35,8 +47,6 @@
   <!-- 🛡️ Admin Management Section -->
   <div class="section">
     <h2>Admin Users</h2>
-
-    <!-- Add New Admin -->
     <form id="adminForm">
       <input class="input" type="text" id="adminFullName" placeholder="Full Name" required>
       <input class="input" type="email" id="adminEmail" placeholder="Email" required>
@@ -44,8 +54,6 @@
       <button type="submit">Add Admin</button>
     </form>
     <div id="adminResponse" style="margin-top: 1em;"></div>
-
-    <!-- List of Admin Users -->
     <h3 style="margin-top:2em;">Existing Admins</h3>
     <div id="adminList"></div>
   </div>
@@ -88,7 +96,6 @@
       <button type="button" id="cancelEditBtn" style="display: none;">Cancel Edit</button>
     </form>
     <div id="tripCreateMessage" style="margin-top: 1em;"></div>
-
     <h3 style="margin-top:2em;">Existing Trips</h3>
     <div id="tripList"></div>
   </div>
@@ -103,36 +110,243 @@
       <button type="button" id="cancelRouteEditBtn" style="display: none;">Cancel Edit</button>
     </form>
     <div id="routeMessage" style="margin-top: 1em;"></div>
-
     <h3 style="margin-top:2em;">All Routes</h3>
     <div id="routeList"></div>
   </div>
 
-  <!-- 📋 Results Section -->
-  <div class="section" id="results"></div>
-
   <script>
     const BASE_URL = "https://quickfare-backend.onrender.com";
 
-    // ✅ From here, **all fetch() calls below are automatically updated** using BASE_URL:
-    // Example: `${BASE_URL}/api/trips`
+    // ✅ Login
+    document.getElementById('loginForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const message = document.getElementById('loginMessage');
 
-    // Update all instances of fetch URLs here with `${BASE_URL}`
-    // (e.g., fetch(`${BASE_URL}/api/trips`))
+      try {
+        const res = await fetch(`${BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
 
-    // ✅ REPLACEMENTS DONE in full JavaScript code (not repeated below for brevity)
-    // But your file contains:
-    // - 13 calls to http://localhost:5000/api/trips
-    // - 4 calls to /api/routes
-    // - 4 to /api/payments
-    // - and so on.
+        const data = await res.json();
+        if (res.ok && data.token) {
+          localStorage.setItem('token', data.token);
+          message.textContent = "✅ Login successful!";
+          message.style.color = "green";
+          loadAdmins();
+          loadRoutes();
+          loadTrips();
+        } else {
+          message.textContent = data.message || "❌ Login failed";
+          message.style.color = "red";
+        }
+      } catch (err) {
+        message.textContent = "❌ Error during login.";
+        message.style.color = "red";
+      }
+    });
 
-    // All are now replaced with: https://quickfare-backend.onrender.com/api/...
+    // 📋 Admin Management
+    document.getElementById('adminForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const fullName = document.getElementById('adminFullName').value;
+      const email = document.getElementById('adminEmail').value;
+      const password = document.getElementById('adminPassword').value;
+      const token = localStorage.getItem('token');
+      const responseBox = document.getElementById('adminResponse');
 
-    // ✅ End of update note.
+      try {
+        const res = await fetch(`${BASE_URL}/api/users`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ fullName, email, password })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          responseBox.textContent = "✅ Admin created!";
+          responseBox.style.color = "green";
+          loadAdmins();
+        } else {
+          responseBox.textContent = data.message || "❌ Error creating admin.";
+          responseBox.style.color = "red";
+        }
+      } catch (err) {
+        responseBox.textContent = "❌ Request failed.";
+        responseBox.style.color = "red";
+      }
+    });
+
+    async function loadAdmins() {
+      const token = localStorage.getItem('token');
+      const list = document.getElementById('adminList');
+      try {
+        const res = await fetch(`${BASE_URL}/api/users`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const users = await res.json();
+        list.innerHTML = users.map(u => `<div class="entry-box">${u.fullName} - ${u.email}</div>`).join('');
+      } catch {
+        list.textContent = "❌ Failed to load admins";
+      }
+    }
+
+    // 🧾 Payments
+    document.getElementById('paymentForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const tripId = document.getElementById('tripIdInput').value;
+      const amount = document.getElementById('amountPaid').value;
+      const paymentMethod = document.getElementById('paymentMethodInput').value;
+      const payerPhone = document.getElementById('payerPhoneInput').value;
+      const token = localStorage.getItem('token');
+      const msg = document.getElementById('paymentResponse');
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/payments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ tripId, amount, paymentMethod, payerPhone })
+        });
+        const data = await res.json();
+        msg.textContent = res.ok ? "✅ Payment added!" : data.message || "❌ Failed";
+        msg.style.color = res.ok ? "green" : "red";
+      } catch {
+        msg.textContent = "❌ Error submitting payment.";
+        msg.style.color = "red";
+      }
+    });
+
+    async function fetchPayments() {
+      const tripId = document.getElementById('tripId').value;
+      const method = document.getElementById('paymentMethod').value;
+      const phone = document.getElementById('payerPhone').value;
+      const token = localStorage.getItem('token');
+
+      let url = `${BASE_URL}/api/payments?`;
+      if (tripId) url += `tripId=${tripId}&`;
+      if (method) url += `paymentMethod=${method}&`;
+      if (phone) url += `payerPhone=${phone}&`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      alert(JSON.stringify(data, null, 2)); // For testing
+    }
+
+    // 🚌 Load routes
+    async function loadRoutes() {
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch(`${BASE_URL}/api/routes`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const routes = await res.json();
+        const select = document.getElementById('tripRouteSelect');
+        select.innerHTML = `<option value="">-- Select Route --</option>`;
+        routes.forEach(r => {
+          const option = document.createElement('option');
+          option.value = r.id;
+          option.textContent = `${r.origin} ➜ ${r.destination}`;
+          select.appendChild(option);
+        });
+      } catch {
+        console.error("Failed to load routes");
+      }
+    }
+
+    // 🚐 Create trip
+    document.getElementById('tripForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const trip = {
+        origin: document.getElementById('tripOrigin').value,
+        destination: document.getElementById('tripDestination').value,
+        fare: document.getElementById('tripFare').value,
+        date: document.getElementById('tripDate').value,
+        time: document.getElementById('tripTime').value,
+        routeId: document.getElementById('tripRouteSelect').value
+      };
+      const token = localStorage.getItem('token');
+      const msg = document.getElementById('tripCreateMessage');
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/trips`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(trip)
+        });
+        const data = await res.json();
+        msg.textContent = res.ok ? "✅ Trip added!" : data.message || "❌ Error";
+        msg.style.color = res.ok ? "green" : "red";
+        loadTrips();
+      } catch {
+        msg.textContent = "❌ Request failed.";
+        msg.style.color = "red";
+      }
+    });
+
+    async function loadTrips() {
+      const token = localStorage.getItem('token');
+      const list = document.getElementById('tripList');
+      try {
+        const res = await fetch(`${BASE_URL}/api/trips`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const trips = await res.json();
+        list.innerHTML = trips.map(t => `<div class="entry-box">${t.origin} ➜ ${t.destination} | K${t.fare}</div>`).join('');
+      } catch {
+        list.textContent = "❌ Failed to load trips";
+      }
+    }
+
+    // 🛣️ Add route
+    document.getElementById('routeForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const origin = document.getElementById('routeOrigin').value;
+      const destination = document.getElementById('routeDestination').value;
+      const token = localStorage.getItem('token');
+      const msg = document.getElementById('routeMessage');
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/routes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ origin, destination })
+        });
+        const data = await res.json();
+        msg.textContent = res.ok ? "✅ Route added!" : data.message || "❌ Failed";
+        msg.style.color = res.ok ? "green" : "red";
+        loadRoutes();
+      } catch {
+        msg.textContent = "❌ Error adding route.";
+        msg.style.color = "red";
+      }
+    });
+
+    // Auto-login check and fetch dashboard data
+    window.onload = function () {
+      const token = localStorage.getItem('token');
+      if (token) {
+        loadAdmins();
+        loadRoutes();
+        loadTrips();
+      }
+    };
   </script>
-
-  <!-- ⚠️ NOTE: The rest of the JS code (all 300+ lines) remain identical, only the base URL was changed. -->
-  <!-- If you want me to paste the entire updated HTML + JS together in full again, I can. Let me know. -->
 </body>
 </html>
