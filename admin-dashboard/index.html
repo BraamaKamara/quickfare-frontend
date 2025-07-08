@@ -28,8 +28,8 @@
       border: 1px solid #ccc;
       border-left: 5px solid #007BFF;
     }
-    .error { color: red; }
     .success { color: green; }
+    .error   { color: red; }
   </style>
 </head>
 <body>
@@ -60,26 +60,17 @@
     <div id="adminList"></div>
   </div>
 
-  <!-- 💳 Payment Filters -->
+  <!-- 🛣️ Route Management -->
   <div class="section">
-    <h2>Filter Payments</h2>
-    <input class="input" id="tripId" placeholder="Filter by Trip ID">
-    <input class="input" id="paymentMethod" placeholder="Filter by Method (e.g. MTN)">
-    <input class="input" id="payerPhone" placeholder="Filter by Phone">
-    <button onclick="fetchPayments()">Fetch Payments</button>
-  </div>
-
-  <!-- 💰 Add Payment -->
-  <div class="section">
-    <h2>Add New Payment</h2>
-    <form id="paymentForm">
-      <input class="input" type="number" id="tripIdInput" placeholder="Trip ID" required>
-      <input class="input" type="number" id="amountPaid" placeholder="Amount Paid" required>
-      <input class="input" type="text" id="paymentMethodInput" placeholder="Payment Method" required>
-      <input class="input" type="text" id="payerPhoneInput" placeholder="Payer Phone" required>
-      <button type="submit">Submit Payment</button>
+    <h2>Route Management</h2>
+    <form id="routeForm">
+      <input class="input" type="text" id="routeOrigin" placeholder="Route Origin" required>
+      <input class="input" type="text" id="routeDestination" placeholder="Route Destination" required>
+      <button type="submit">Add Route</button>
     </form>
-    <div id="paymentResponse" style="margin-top: 1em;"></div>
+    <div id="routeMessage" style="margin-top: 1em;"></div>
+    <h3 style="margin-top:2em;">All Routes</h3>
+    <div id="routeList"></div>
   </div>
 
   <!-- 🚌 Trip Management -->
@@ -95,25 +86,28 @@
         <option value="">-- Select Route --</option>
       </select>
       <button type="submit">Create Trip</button>
-      <button type="button" id="cancelTripEdit" style="display:none;">Cancel Edit</button>
     </form>
     <div id="tripCreateMessage" style="margin-top: 1em;"></div>
     <h3 style="margin-top:2em;">Existing Trips</h3>
     <div id="tripList"></div>
   </div>
 
-  <!-- 🚏 Route Management -->
+  <!-- 💳 Payment Submission & Filters -->
   <div class="section">
-    <h2>Route Management</h2>
-    <form id="routeForm">
-      <input class="input" type="text" id="routeOrigin" placeholder="Route Origin" required>
-      <input class="input" type="text" id="routeDestination" placeholder="Route Destination" required>
-      <button type="submit">Add Route</button>
-      <button type="button" id="cancelRouteEdit" style="display:none;">Cancel Edit</button>
+    <h2>Add New Payment</h2>
+    <form id="paymentForm">
+      <input class="input" type="number" id="tripIdInput" placeholder="Trip ID" required>
+      <input class="input" type="number" id="amountPaid" placeholder="Amount Paid" required>
+      <input class="input" type="text" id="paymentMethodInput" placeholder="Payment Method" required>
+      <input class="input" type="text" id="payerPhoneInput" placeholder="Payer Phone" required>
+      <button type="submit">Submit Payment</button>
     </form>
-    <div id="routeMessage" style="margin-top: 1em;"></div>
-    <h3 style="margin-top:2em;">All Routes</h3>
-    <div id="routeList"></div>
+    <div id="paymentResponse" style="margin-top: 1em;"></div>
+    <h2 style="margin-top:2em;">Filter Payments</h2>
+    <input class="input" id="tripId" placeholder="Filter by Trip ID">
+    <input class="input" id="paymentMethod" placeholder="Filter by Method">
+    <input class="input" id="payerPhone" placeholder="Filter by Phone">
+    <button onclick="fetchPayments()">Fetch Payments</button>
   </div>
 
   <script>
@@ -122,16 +116,18 @@
     // 🔐 Login
     document.getElementById('loginForm').addEventListener('submit', async e => {
       e.preventDefault();
-      const email = e.target.email.value, password = e.target.password.value;
       const msg = document.getElementById('loginMessage');
       try {
         const res = await fetch(`${BASE_URL}/api/auth/login`, {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({email,password})
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value
+          })
         });
         const data = await res.json();
-        if(res.ok){
+        if (res.ok && data.token) {
           localStorage.setItem('token', data.token);
           msg.textContent = "✅ Login successful!";
           msg.className = "success";
@@ -149,21 +145,22 @@
     // 🛡️ Create Admin
     document.getElementById('adminForm').addEventListener('submit', async e => {
       e.preventDefault();
-      const fullName = e.target.adminFullName.value,
-            email    = e.target.adminEmail.value,
-            password = e.target.adminPassword.value;
       const box = document.getElementById('adminResponse');
       try {
         const res = await fetch(`${BASE_URL}/api/admins`, {
-          method:'POST',
-          headers:{
+          method: 'POST',
+          headers: {
             'Content-Type':'application/json',
-            'Authorization':`Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
-          body: JSON.stringify({ fullName, email, password })
+          body: JSON.stringify({
+            fullName: document.getElementById('adminFullName').value,
+            email:    document.getElementById('adminEmail').value,
+            password: document.getElementById('adminPassword').value
+          })
         });
         const data = await res.json();
-        if(res.ok){
+        if (res.ok) {
           box.textContent = "✅ Admin created!";
           box.className = "success";
           loadAdmins();
@@ -178,14 +175,14 @@
     });
 
     // 📋 Load Admins
-    async function loadAdmins(){
+    async function loadAdmins() {
       const list = document.getElementById('adminList');
       try {
         const res = await fetch(`${BASE_URL}/api/admins`, {
-          headers:{ 'Authorization':`Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const admins = await res.json();
-        list.innerHTML = admins.map(a=>
+        list.innerHTML = admins.map(a =>
           `<div class="entry-box">${a.fullName} — ${a.email}</div>`
         ).join('');
       } catch {
@@ -194,107 +191,102 @@
       }
     }
 
-    // 🧾 Add Payment
-    document.getElementById('paymentForm').addEventListener('submit', async e => {
+    // 🛣️ Add Route
+    document.getElementById('routeForm').addEventListener('submit', async e => {
       e.preventDefault();
-      const body = {
-        tripId: e.target.tripIdInput.value,
-        amount: e.target.amountPaid.value,
-        paymentMethod: e.target.paymentMethodInput.value,
-        payerPhone: e.target.payerPhoneInput.value
-      };
-      const msg = document.getElementById('paymentResponse');
-      try {
-        const res = await fetch(`${BASE_URL}/api/payments`, {
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'Authorization':`Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        msg.textContent = res.ok ? "✅ Payment added!" : data.message;
-        msg.className = res.ok ? "success" : "error";
-      } catch {
-        msg.textContent = "❌ Error submitting payment.";
-        msg.className = "error";
-      }
-    });
-
-    // 🔍 Filter Payments (alert for now)
-    async function fetchPayments(){
-      const params = new URLSearchParams();
-      ['tripId','paymentMethod','payerPhone'].forEach(id=>{
-        const v=document.getElementById(id).value;
-        if(v) params.append(id,v);
-      });
-      try {
-        const res = await fetch(`${BASE_URL}/api/payments?${params}`, {
-          headers:{ 'Authorization':`Bearer ${localStorage.getItem('token')}` }
-        });
-        const data = await res.json();
-        alert(JSON.stringify(data,null,2));
-      } catch {
-        alert("❌ Failed to fetch payments");
-      }
-    }
-
-    // 🚌 Load Routes
-    async function loadRoutes(){
-      const sel = document.getElementById('tripRouteSelect');
-      sel.innerHTML = `<option value="">-- Select Route --</option>`;
+      const msg = document.getElementById('routeMessage');
       try {
         const res = await fetch(`${BASE_URL}/api/routes`, {
-          headers:{ 'Authorization':`Bearer ${localStorage.getItem('token')}` }
-        });
-        (await res.json()).forEach(r=>{
-          sel.innerHTML += `<option value="${r.id}">${r.origin} ➜ ${r.destination}</option>`;
-        });
-      } catch {
-        console.error("Failed to load routes");
-      }
-    }
-
-    // 🚐 Create Trip
-    document.getElementById('tripForm').addEventListener('submit', async e=>{
-      e.preventDefault();
-      const msg = document.getElementById('tripCreateMessage');
-      const trip = {
-        origin: e.target.tripOrigin.value,
-        destination: e.target.tripDestination.value,
-        fare: e.target.tripFare.value,
-        date: e.target.tripDate.value,
-        time: e.target.tripTime.value,
-        routeId: e.target.tripRouteSelect.value
-      };
-      try {
-        const res = await fetch(`${BASE_URL}/api/trips`, {
-          method:'POST',
-          headers:{
+          method: 'POST',
+          headers: {
             'Content-Type':'application/json',
-            'Authorization':`Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
-          body: JSON.stringify(trip)
+          body: JSON.stringify({
+            origin:      document.getElementById('routeOrigin').value,
+            destination: document.getElementById('routeDestination').value
+          })
         });
         const data = await res.json();
-        msg.textContent = res.ok ? "✅ Trip added!" : data.message;
-        msg.className = res.ok ? "success" : "error";
-        loadTrips();
+        if (res.ok) {
+          msg.textContent = "✅ Route added!";
+          msg.className = "success";
+          loadRoutes();
+        } else {
+          msg.textContent = data.message;
+          msg.className = "error";
+        }
       } catch {
         msg.textContent = "❌ Request failed.";
         msg.className = "error";
       }
     });
 
-    // 🚏 Load Trips
-    async function loadTrips(){
+    // 🧭 Load Routes
+    async function loadRoutes() {
+      const list = document.getElementById('routeList');
+      try {
+        const res = await fetch(`${BASE_URL}/api/routes`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const routes = await res.json();
+        list.innerHTML = routes.map(r =>
+          `<div class="entry-box">${r.origin} ➜ ${r.destination}</div>`
+        ).join('');
+        // Also populate trip dropdown
+        const sel = document.getElementById('tripRouteSelect');
+        sel.innerHTML = `<option value="">-- Select Route --</option>` +
+          routes.map(r => `<option value="${r.id}">${r.origin} ➜ ${r.destination}</option>`).join('');
+      } catch {
+        list.textContent = "❌ Failed to load routes";
+        list.className = "error";
+      }
+    }
+
+    // 🚐 Add Trip
+    document.getElementById('tripForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const msg = document.getElementById('tripCreateMessage');
+      try {
+        const res = await fetch(`${BASE_URL}/api/trips`, {
+          method: 'POST',
+          headers: {
+            'Content-Type':'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            origin:      document.getElementById('tripOrigin').value,
+            destination: document.getElementById('tripDestination').value,
+            fare:        document.getElementById('tripFare').value,
+            date:        document.getElementById('tripDate').value,
+            time:        document.getElementById('tripTime').value,
+            routeId:     document.getElementById('tripRouteSelect').value
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = "✅ Trip added!";
+          msg.className = "success";
+          loadTrips();
+        } else {
+          msg.textContent = data.message;
+          msg.className = "error";
+        }
+      } catch {
+        msg.textContent = "❌ Request failed.";
+        msg.className = "error";
+      }
+    });
+
+    // 🕒 Load Trips
+    async function loadTrips() {
       const list = document.getElementById('tripList');
       try {
         const res = await fetch(`${BASE_URL}/api/trips`, {
-          headers:{ 'Authorization':`Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
-        list.innerHTML = (await res.json()).map(t=>
+        const trips = await res.json();
+        list.innerHTML = trips.map(t =>
           `<div class="entry-box">${t.origin} ➜ ${t.destination} | K${t.fare}</div>`
         ).join('');
       } catch {
@@ -303,9 +295,59 @@
       }
     }
 
-    // 🔄 On page load, if token exists auto-fetch
+    // 💳 Add Payment
+    document.getElementById('paymentForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const msg = document.getElementById('paymentResponse');
+      try {
+        const res = await fetch(`${BASE_URL}/api/payments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type':'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            tripId:        document.getElementById('tripIdInput').value,
+            amountPaid:    document.getElementById('amountPaid').value,
+            paymentMethod: document.getElementById('paymentMethodInput').value,
+            payerPhone:    document.getElementById('payerPhoneInput').value
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = "✅ Payment submitted!";
+          msg.className = "success";
+        } else {
+          msg.textContent = data.message;
+          msg.className = "error";
+        }
+      } catch {
+        msg.textContent = "❌ Error submitting payment.";
+        msg.className = "error";
+      }
+    });
+
+    // 🔍 Filter Payments
+    async function fetchPayments() {
+      const params = new URLSearchParams();
+      ['tripId','paymentMethod','payerPhone'].forEach(id => {
+        const v = document.getElementById(id).value;
+        if (v) params.append(id, v);
+      });
+      try {
+        const res = await fetch(`${BASE_URL}/api/payments?${params}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const data = await res.json();
+        alert(JSON.stringify(data, null, 2));
+      } catch {
+        alert("❌ Failed to fetch payments");
+      }
+    }
+
+    // 🔄 Auto-load if already logged in
     window.addEventListener('DOMContentLoaded', () => {
-      if(localStorage.getItem('token')){
+      if (localStorage.getItem('token')) {
         loadAdmins();
         loadRoutes();
         loadTrips();
