@@ -6,7 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: Arial; padding: 20px; background-color: #f4f4f4; }
-    h1 { color: #333; }
+    h1 { color: #333; display: inline-block; margin-right: 20px; }
+    button { padding: 6px 12px; margin-top: 10px; }
     .section {
       background: #fff;
       padding: 20px;
@@ -20,7 +21,6 @@
       width: 250px;
       display: block;
     }
-    button { padding: 6px 12px; margin-top: 10px; }
     .entry-box {
       background-color: #fefefe;
       padding: 10px;
@@ -34,9 +34,10 @@
 </head>
 <body>
   <h1>QuickFare Admin Dashboard</h1>
+  <button id="logoutBtn" style="display:none;">Logout</button>
 
-  <!-- 🔐 Admin Login -->
-  <div class="section">
+  <!-- Login Section -->
+  <div id="loginSection" class="section">
     <h2>Admin Login</h2>
     <form id="loginForm">
       <input class="input" type="email" id="email" placeholder="Email" required>
@@ -46,74 +47,100 @@
     <div id="loginMessage" class="error" style="margin-top: 1em;"></div>
   </div>
 
-  <!-- 🛡️ Admin Management -->
-  <div class="section">
-    <h2>Admin Users</h2>
-    <form id="adminForm">
-      <input class="input" type="text" id="adminFullName" placeholder="Full Name" required>
-      <input class="input" type="email" id="adminEmail" placeholder="Email" required>
-      <input class="input" type="password" id="adminPassword" placeholder="Password" required>
-      <button type="submit">Add Admin</button>
-    </form>
-    <div id="adminResponse" style="margin-top: 1em;"></div>
-    <h3 style="margin-top:2em;">Existing Admins</h3>
-    <div id="adminList"></div>
-  </div>
+  <!-- Main Dashboard (hidden until login) -->
+  <div id="mainSection" style="display:none;">
+    <!-- Admin Management -->
+    <div class="section">
+      <h2>Admin Users</h2>
+      <form id="adminForm">
+        <input class="input" type="text" id="adminFullName" placeholder="Full Name" required>
+        <input class="input" type="email" id="adminEmail" placeholder="Email" required>
+        <input class="input" type="password" id="adminPassword" placeholder="Password" required>
+        <button type="submit">Add Admin</button>
+      </form>
+      <div id="adminResponse" style="margin-top: 1em;"></div>
+      <h3 style="margin-top:2em;">Existing Admins</h3>
+      <div id="adminList"></div>
+    </div>
 
-  <!-- 🛣️ Route Management -->
-  <div class="section">
-    <h2>Route Management</h2>
-    <form id="routeForm">
-      <input class="input" type="text" id="routeOrigin" placeholder="Route Origin" required>
-      <input class="input" type="text" id="routeDestination" placeholder="Route Destination" required>
-      <button type="submit">Add Route</button>
-    </form>
-    <div id="routeMessage" style="margin-top: 1em;"></div>
-    <h3 style="margin-top:2em;">All Routes</h3>
-    <div id="routeList"></div>
-  </div>
+    <!-- Route Management -->
+    <div class="section">
+      <h2>Route Management</h2>
+      <form id="routeForm">
+        <input class="input" type="text" id="routeOrigin" placeholder="Route Origin" required>
+        <input class="input" type="text" id="routeDestination" placeholder="Route Destination" required>
+        <button type="submit">Add Route</button>
+      </form>
+      <div id="routeMessage" style="margin-top: 1em;"></div>
+      <h3 style="margin-top:2em;">All Routes</h3>
+      <div id="routeList"></div>
+    </div>
 
-  <!-- 🚌 Trip Management -->
-  <div class="section">
-    <h2>Trip Management</h2>
-    <form id="tripForm">
-      <input class="input" type="text" id="tripOrigin" placeholder="Trip Origin" required>
-      <input class="input" type="text" id="tripDestination" placeholder="Trip Destination" required>
-      <input class="input" type="number" id="tripFare" placeholder="Fare (ZMW)" required>
-      <input class="input" type="date" id="tripDate" required>
-      <input class="input" type="time" id="tripTime" required>
-      <select class="input" id="tripRouteSelect" required>
-        <option value="">-- Select Route --</option>
-      </select>
-      <button type="submit">Create Trip</button>
-    </form>
-    <div id="tripCreateMessage" style="margin-top: 1em;"></div>
-    <h3 style="margin-top:2em;">Existing Trips</h3>
-    <div id="tripList"></div>
-  </div>
+    <!-- Trip Management -->
+    <div class="section">
+      <h2>Trip Management</h2>
+      <form id="tripForm">
+        <input class="input" type="text" id="tripOrigin" placeholder="Trip Origin" required>
+        <input class="input" type="text" id="tripDestination" placeholder="Trip Destination" required>
+        <input class="input" type="number" id="tripFare" placeholder="Fare (ZMW)" required>
+        <input class="input" type="date" id="tripDate" required>
+        <input class="input" type="time" id="tripTime" required>
+        <select class="input" id="tripRouteSelect" required>
+          <option value="">-- Select Route --</option>
+        </select>
+        <button type="submit">Create Trip</button>
+      </form>
+      <div id="tripCreateMessage" style="margin-top: 1em;"></div>
+      <h3 style="margin-top:2em;">Existing Trips</h3>
+      <div id="tripList"></div>
+    </div>
 
-  <!-- 💳 Payment Submission & Filters -->
-  <div class="section">
-    <h2>Add New Payment</h2>
-    <form id="paymentForm">
-      <input class="input" type="number" id="tripIdInput" placeholder="Trip ID" required>
-      <input class="input" type="number" id="amountPaid" placeholder="Amount Paid" required>
-      <input class="input" type="text" id="paymentMethodInput" placeholder="Payment Method" required>
-      <input class="input" type="text" id="payerPhoneInput" placeholder="Payer Phone" required>
-      <button type="submit">Submit Payment</button>
-    </form>
-    <div id="paymentResponse" style="margin-top: 1em;"></div>
-    <h2 style="margin-top:2em;">Filter Payments</h2>
-    <input class="input" id="tripId" placeholder="Filter by Trip ID">
-    <input class="input" id="paymentMethod" placeholder="Filter by Method">
-    <input class="input" id="payerPhone" placeholder="Filter by Phone">
-    <button onclick="fetchPayments()">Fetch Payments</button>
+    <!-- Payment Submission -->
+    <div class="section">
+      <h2>Add New Payment</h2>
+      <form id="paymentForm">
+        <input class="input" type="number" id="tripIdInput" placeholder="Trip ID" required>
+        <input class="input" type="number" id="amountPaid" placeholder="Amount Paid" required>
+        <input class="input" type="text" id="paymentMethodInput" placeholder="Payment Method" required>
+        <input class="input" type="text" id="payerPhoneInput" placeholder="Payer Phone" required>
+        <button type="submit">Submit Payment</button>
+      </form>
+      <div id="paymentResponse" style="margin-top: 1em;"></div>
+    </div>
+
+    <!-- Payment Filters & Inline List -->
+    <div class="section">
+      <h2>Filter Payments</h2>
+      <input class="input" id="tripId" placeholder="Filter by Trip ID">
+      <input class="input" id="paymentMethod" placeholder="Filter by Method">
+      <input class="input" id="payerPhone" placeholder="Filter by Phone">
+      <button onclick="fetchPayments()">Fetch Payments</button>
+      <div id="paymentsList" style="margin-top:1em;"></div>
+    </div>
   </div>
 
   <script>
     const BASE_URL = "https://quickfare-backend.onrender.com";
 
-    // 🔐 Login
+    // Show/hide sections
+    function showDashboard() {
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('mainSection').style.display = 'block';
+      document.getElementById('logoutBtn').style.display = 'inline-block';
+    }
+    function showLogin() {
+      document.getElementById('loginSection').style.display = 'block';
+      document.getElementById('mainSection').style.display = 'none';
+      document.getElementById('logoutBtn').style.display = 'none';
+    }
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      showLogin();
+    });
+
+    // Login
     document.getElementById('loginForm').addEventListener('submit', async e => {
       e.preventDefault();
       const msg = document.getElementById('loginMessage');
@@ -131,6 +158,7 @@
           localStorage.setItem('token', data.token);
           msg.textContent = "✅ Login successful!";
           msg.className = "success";
+          showDashboard();
           await Promise.all([loadAdmins(), loadRoutes(), loadTrips()]);
         } else {
           msg.textContent = data.message || "❌ Login failed";
@@ -142,7 +170,7 @@
       }
     });
 
-    // 🛡️ Create Admin
+    // Create Admin
     document.getElementById('adminForm').addEventListener('submit', async e => {
       e.preventDefault();
       const box = document.getElementById('adminResponse');
@@ -174,7 +202,7 @@
       }
     });
 
-    // 📋 Load Admins
+    // Load Admins
     async function loadAdmins() {
       const list = document.getElementById('adminList');
       try {
@@ -191,7 +219,7 @@
       }
     }
 
-    // 🛣️ Add Route
+    // Add Route
     document.getElementById('routeForm').addEventListener('submit', async e => {
       e.preventDefault();
       const msg = document.getElementById('routeMessage');
@@ -222,7 +250,7 @@
       }
     });
 
-    // 🧭 Load Routes
+    // Load Routes
     async function loadRoutes() {
       const list = document.getElementById('routeList');
       try {
@@ -233,7 +261,7 @@
         list.innerHTML = routes.map(r =>
           `<div class="entry-box">${r.origin} ➜ ${r.destination}</div>`
         ).join('');
-        // Also populate trip dropdown
+        // Populate trip dropdown
         const sel = document.getElementById('tripRouteSelect');
         sel.innerHTML = `<option value="">-- Select Route --</option>` +
           routes.map(r => `<option value="${r.id}">${r.origin} ➜ ${r.destination}</option>`).join('');
@@ -243,7 +271,7 @@
       }
     }
 
-    // 🚐 Add Trip
+    // Add Trip
     document.getElementById('tripForm').addEventListener('submit', async e => {
       e.preventDefault();
       const msg = document.getElementById('tripCreateMessage');
@@ -278,7 +306,7 @@
       }
     });
 
-    // 🕒 Load Trips
+    // Load Trips
     async function loadTrips() {
       const list = document.getElementById('tripList');
       try {
@@ -295,7 +323,7 @@
       }
     }
 
-    // 💳 Add Payment
+    // Add Payment
     document.getElementById('paymentForm').addEventListener('submit', async e => {
       e.preventDefault();
       const msg = document.getElementById('paymentResponse');
@@ -327,27 +355,42 @@
       }
     });
 
-    // 🔍 Filter Payments
+    // Fetch Payments Inline
     async function fetchPayments() {
       const params = new URLSearchParams();
       ['tripId','paymentMethod','payerPhone'].forEach(id => {
         const v = document.getElementById(id).value;
         if (v) params.append(id, v);
       });
+      const list = document.getElementById('paymentsList');
       try {
         const res = await fetch(`${BASE_URL}/api/payments?${params}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         const data = await res.json();
-        alert(JSON.stringify(data, null, 2));
+        if (Array.isArray(data)) {
+          list.innerHTML = data.map(p =>
+            `<div class="entry-box">
+              <strong>Amount:</strong> ZMW ${p.amountPaid}<br>
+              <strong>Method:</strong> ${p.paymentMethod}<br>
+              <strong>Phone:</strong> ${p.payerPhone}<br>
+              <strong>Trip:</strong> ${p.trip?.origin} ➜ ${p.trip?.destination} @ ${p.trip?.time}
+            </div>`
+          ).join('');
+        } else {
+          list.textContent = `❌ ${data.message}`;
+          list.className = "error";
+        }
       } catch {
-        alert("❌ Failed to fetch payments");
+        list.textContent = "❌ Failed to fetch payments";
+        list.className = "error";
       }
     }
 
-    // 🔄 Auto-load if already logged in
+    // On load, check token
     window.addEventListener('DOMContentLoaded', () => {
       if (localStorage.getItem('token')) {
+        showDashboard();
         loadAdmins();
         loadRoutes();
         loadTrips();
