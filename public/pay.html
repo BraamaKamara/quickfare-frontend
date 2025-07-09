@@ -2,163 +2,140 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>QuickFare - Confirm Payment</title>
+  <title>QuickFare – Pay for a Trip</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f4f7fa;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
+    body { font-family: Arial, sans-serif; padding: 20px; background:#f4f4f4; }
+    .card {
+      background:#fff; padding:20px; border-radius:6px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.1); max-width:400px; margin:auto;
     }
-
-    .container {
-      background: white;
-      padding: 24px;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      width: 90%;
-      max-width: 420px;
-      text-align: center;
+    h1 { margin-bottom:1em; font-size:1.5em; text-align:center; }
+    .input, select, button {
+      width:100%; padding:8px; margin:8px 0; box-sizing:border-box;
+      border:1px solid #ccc; border-radius:4px;
     }
-
-    h1 {
-      color: #1976d2;
-      margin-bottom: 16px;
-    }
-
-    .trip-info {
-      background: #e3f2fd;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 20px;
-      text-align: left;
-    }
-
-    .trip-info p {
-      margin: 6px 0;
-      font-size: 0.95rem;
-    }
-
-    button {
-      background-color: #1976d2;
-      color: white;
-      border: none;
-      padding: 12px;
-      font-size: 1rem;
-      border-radius: 8px;
-      cursor: pointer;
-      width: 100%;
-    }
-
-    button:hover {
-      background-color: #145ea8;
-    }
-
-    .footer {
-      margin-top: 20px;
-      font-size: 0.85rem;
-      color: #777;
-    }
-
-    .error {
-      color: red;
-      font-size: 0.9rem;
-      margin-top: 10px;
-    }
-
-    .loading {
-      font-style: italic;
-      color: #777;
-    }
+    button { background:#007BFF; color:#fff; border:none; cursor:pointer; }
+    button:disabled { background:#ccc; cursor:not-allowed; }
+    .entry { margin:8px 0; padding:8px; background:#e7f3ff; border-radius:4px; }
+    .success { color:green; margin-top:8px; }
+    .error   { color:red;   margin-top:8px; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Confirm Payment</h1>
-    <div class="trip-info" id="tripInfo">
-      <p><strong>From:</strong> <span id="origin" class="loading">Loading…</span></p>
-      <p><strong>To:</strong> <span id="destination" class="loading">Loading…</span></p>
-      <p><strong>Fare:</strong> ZMW <span id="fare" class="loading">…</span></p>
+  <div class="card">
+    <h1>Pay for a Trip</h1>
+
+    <!-- 1) Trip Selector -->
+    <label for="tripSelect">Choose a trip:</label>
+    <select id="tripSelect" class="input">
+      <option value="">Loading trips…</option>
+    </select>
+
+    <!-- 2) Trip Details & Payment Form -->
+    <div id="paymentForm" style="display:none;">
+      <div class="entry">
+        <strong>From:</strong> <span id="detailOrigin"></span><br>
+        <strong>To:</strong>   <span id="detailDestination"></span><br>
+        <strong>Fare:</strong> ZMW <span id="detailFare"></span>
+      </div>
+
+      <input class="input" type="text" id="payerPhone" placeholder="Your phone number" required>
+      <input class="input" type="text" id="paymentMethod" placeholder="Payment method (e.g. MTN)" required>
+      <button id="confirmBtn">✅ Confirm Payment</button>
+      <div id="paymentMsg"></div>
     </div>
-
-    <form id="confirmForm">
-      <input type="hidden" name="tripId" id="tripId" />
-      <input type="hidden" name="amount" id="amount" />
-      <input type="hidden" name="phone" value="+260970000000" />
-      <button type="submit">✅ Confirm Payment</button>
-    </form>
-
-    <div id="errorMessage" class="error"></div>
-    <div class="footer">Powered by QuickFare</div>
   </div>
 
   <script>
-    async function loadTripData() {
-      const params = new URLSearchParams(window.location.search);
-      const tripId = params.get('tripId');
-      const amount = params.get('amount');
+    const BASE = 'https://quickfare-backend.onrender.com';
+    let trips = [];
 
-      if (!tripId || !amount) {
-        document.getElementById('errorMessage').textContent = '❌ Missing trip ID or amount.';
-        return;
-      }
-
-      document.getElementById('tripId').value = tripId;
-      document.getElementById('amount').value = amount;
-
+    // 1) Load all public trips and populate the <select>
+    async function loadTrips() {
       try {
-        const res = await fetch(`/api/trips/public/${tripId}`);
-        if (!res.ok) throw new Error('Trip not found.');
-
-        const trip = await res.json();
-        const route = trip.route || {};
-
-        document.getElementById('origin').textContent = route.origin || trip.origin || 'N/A';
-        document.getElementById('destination').textContent = route.destination || trip.destination || 'N/A';
-        document.getElementById('fare').textContent = trip.fare || amount;
+        const res = await fetch(`${BASE}/api/public-trips`);
+        trips = await res.json();
+        const sel = document.getElementById('tripSelect');
+        sel.innerHTML = '<option value="">-- Select a trip --</option>';
+        trips.forEach(t => {
+          const d = new Date(t.date);
+          sel.innerHTML += `<option value="${t.id}">
+            ${t.origin} ➜ ${t.destination} | ${d.toLocaleDateString()} ${t.time}
+          </option>`;
+        });
       } catch (err) {
-        console.error('Error loading trip data:', err);
-        document.getElementById('errorMessage').textContent = '❌ Could not load trip information.';
+        console.error('Could not load trips', err);
+        document.getElementById('tripSelect').innerHTML =
+          '<option value="">Failed to load trips</option>';
       }
     }
 
-    document.getElementById('confirmForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
+    // 2) When a trip is selected, show its details + payment fields
+    document.getElementById('tripSelect').addEventListener('change', e => {
+      const id = e.target.value;
+      const trip = trips.find(t => String(t.id) === id);
+      if (!trip) {
+        document.getElementById('paymentForm').style.display = 'none';
+        return;
+      }
+      document.getElementById('detailOrigin').textContent = trip.origin;
+      document.getElementById('detailDestination').textContent = trip.destination;
+      document.getElementById('detailFare').textContent = trip.fare;
+      document.getElementById('paymentMsg').textContent = '';
+      document.getElementById('paymentForm').style.display = 'block';
+    });
 
-      const tripId = document.getElementById('tripId').value;
-      const amount = document.getElementById('amount').value;
-      const phone = document.querySelector('[name="phone"]').value;
+    // 3) Confirm Payment handler
+    document.getElementById('confirmBtn').addEventListener('click', async () => {
+      const id     = document.getElementById('tripSelect').value;
+      const fare   = document.getElementById('detailFare').textContent;
+      const phone  = document.getElementById('payerPhone').value.trim();
+      const method = document.getElementById('paymentMethod').value.trim();
+      const msgBox = document.getElementById('paymentMsg');
+      msgBox.textContent = '';
 
-      const body = {
-        tripId,
-        amount,
-        phone,
-        paymentMethod: 'QR'
-      };
+      if (!phone || !method) {
+        msgBox.textContent = '❌ Please enter phone and method.';
+        msgBox.className = 'error';
+        return;
+      }
 
       try {
-        const res = await fetch('/api/payments/confirm', {
+        const res = await fetch(`${BASE}/api/payments`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
+          body: JSON.stringify({
+            tripId:        id,
+            amountPaid:    fare,
+            payerPhone:    phone,
+            paymentMethod: method
+          })
         });
 
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Payment failed');
-        alert(result.message || '✅ Payment confirmed.');
+        // Try parse JSON if there is any
+        let data = {};
+        try { data = await res.json(); } catch {}
+
+        if (res.ok) {
+          msgBox.textContent = '✅ Payment confirmed!';
+          msgBox.className = 'success';
+          // Optionally reset form:
+          // document.getElementById('payerPhone').value = '';
+          // document.getElementById('paymentMethod').value = '';
+        } else {
+          msgBox.textContent = `❌ ${data.message || res.statusText}`;
+          msgBox.className = 'error';
+        }
       } catch (err) {
         console.error('Payment error:', err);
-        document.getElementById('errorMessage').textContent = `❌ ${err.message}`;
+        msgBox.textContent = '❌ Network or server error.';
+        msgBox.className = 'error';
       }
     });
 
-    // Initial trigger
-    loadTripData();
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', loadTrips);
   </script>
 </body>
 </html>
