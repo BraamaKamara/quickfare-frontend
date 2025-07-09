@@ -2,95 +2,138 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QuickFare Payment</title>
+  <title>QR Payment</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-      background: #f4f4f4;
+    body { font-family: Arial, sans-serif; background:#f4f4f4; padding:20px; }
+    .card {
+      background:#fff; max-width:400px; margin:auto;
+      padding:20px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1);
     }
-    .container {
-      background: white;
-      padding: 20px;
-      max-width: 400px;
-      margin: auto;
-      border-radius: 8px;
-      box-shadow: 0 0 10px #ccc;
+    h1 { text-align:center; font-size:1.5em; margin-bottom:1em; }
+    #reader { width:100%; margin-bottom:1em; }
+    .entry { background:#e7f3ff; padding:10px; border-radius:4px; margin-bottom:1em; }
+    .entry b { display:inline-block; width:80px; }
+    .input, button {
+      width:100%; padding:8px; margin:8px 0; box-sizing:border-box;
+      border:1px solid #ccc; border-radius:4px;
     }
-    input, button {
-      width: 100%;
-      padding: 12px;
-      margin: 10px 0;
-      font-size: 16px;
-    }
-    .success {
-      color: green;
-      font-weight: bold;
-    }
-    .error {
-      color: red;
-    }
+    button { background:#28a745; color:#fff; border:none; cursor:pointer; }
+    button:disabled { background:#ccc; cursor:not-allowed; }
+    .success { color:green; margin-top:10px; }
+    .error   { color:red;   margin-top:10px; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Confirm Payment</h2>
-    <p id="tripInfo">Loading trip info...</p>
+  <div class="card">
+    <h1>Scan & Pay via QR</h1>
+    <!-- 1) QR Scanner -->
+    <div id="reader"></div>
+    <div id="scanError" class="error"></div>
 
-    <input type="tel" id="phone" placeholder="Enter phone number" required />
-    <button onclick="submitPayment()">Pay Now</button>
-
-    <p id="responseMessage"></p>
+    <!-- 2) Trip Details + Payment Form -->
+    <div id="paymentSection" style="display:none;">
+      <div class="entry">
+        <div><b>From:</b> <span id="oOrigin"></span></div>
+        <div><b>To:</b> <span id="oDestination"></span></div>
+        <div><b>Fare:</b> ZMW <span id="oFare"></span></div>
+        <div><b>Date:</b> <span id="oDate"></span></div>
+        <div><b>Time:</b> <span id="oTime"></span></div>
+      </div>
+      <input class="input" id="payerPhone" type="text" placeholder="Your phone (e.g. 0978123456)" />
+      <input class="input" id="paymentMethod" type="text" placeholder="Payment method (e.g. MTN)" />
+      <button id="confirmBtn">✅ Confirm Payment</button>
+      <div id="paymentMsg"></div>
+    </div>
   </div>
 
+  <!-- Html5Qrcode for camera+QR scanning -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const tripId = urlParams.get('tripId');
-    const amount = urlParams.get('amount');
+    const BACKEND = 'https://quickfare-backend.onrender.com';
+    let currentData = null;
 
-    const tripInfo = document.getElementById('tripInfo');
-    const responseMessage = document.getElementById('responseMessage');
-
-    if (!tripId || !amount) {
-      tripInfo.textContent = "Missing payment information.";
-      document.querySelector('button').disabled = true;
-    } else {
-      tripInfo.textContent = `Trip ID: ${tripId} | Fare: ZMW ${amount}`;
-    }
-
-    async function submitPayment() {
-      const phone = document.getElementById('phone').value;
-
-      if (!phone || phone.length < 9) {
-        responseMessage.textContent = "⚠️ Enter a valid phone number.";
-        responseMessage.className = "error";
+    // Called when a QR is successfully scanned
+    function onScanSuccess(decodedText, decodedResult) {
+      try {
+        const data = JSON.parse(decodedText);
+        currentData = data;
+      } catch (e) {
+        document.getElementById('scanError').textContent = '❌ Invalid QR payload';
         return;
       }
 
-      const res = await fetch('/api/payments/confirm', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          tripId,
-          amount,
-          phone,
-          paymentMethod: 'QR'
-        })
-      });
+      // stop scanning
+      html5QrcodeScanner.clear().catch(console.error);
 
-      const data = await res.json();
+      // hide scanner & show form
+      document.getElementById('reader').style.display = 'none';
+      document.getElementById('scanError').textContent = '';
+      const sec = document.getElementById('paymentSection');
+      sec.style.display = 'block';
 
-      if (res.ok) {
-        responseMessage.textContent = data.message;
-        responseMessage.className = "success";
-      } else {
-        responseMessage.textContent = data.error || "❌ Payment failed.";
-        responseMessage.className = "error";
-      }
+      // populate details
+      document.getElementById('oOrigin').textContent      = currentData.origin;
+      document.getElementById('oDestination').textContent = currentData.destination;
+      document.getElementById('oFare').textContent        = currentData.fare;
+      document.getElementById('oDate').textContent        = currentData.date.split('T')[0];
+      document.getElementById('oTime').textContent        = currentData.time;
     }
+
+    function onScanFailure(error) {
+      // no-op (could log to console)
+    }
+
+    // Initialize scanner
+    const html5QrcodeScanner = new Html5Qrcode("reader");
+    html5QrcodeScanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      onScanSuccess,
+      onScanFailure
+    ).catch(err => {
+      document.getElementById('scanError').textContent = '❌ Camera error: ' + err;
+    });
+
+    // Confirm payment click
+    document.getElementById('confirmBtn').addEventListener('click', async () => {
+      const phone  = document.getElementById('payerPhone').value.trim();
+      const method = document.getElementById('paymentMethod').value.trim();
+      const msg    = document.getElementById('paymentMsg');
+      msg.textContent = '';
+
+      if (!phone || !method) {
+        msg.textContent = '❌ Please enter phone & payment method.';
+        msg.className = 'error';
+        return;
+      }
+
+      try {
+        const res = await fetch(`${BACKEND}/api/payments/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId:        currentData.tripId,
+            amount:        currentData.fare,
+            phone,
+            paymentMethod: method
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok) {
+          msg.textContent = data.message || '✅ Payment confirmed!';
+          msg.className = 'success';
+        } else {
+          msg.textContent = `❌ ${data.error || data.message || res.statusText}`;
+          msg.className = 'error';
+        }
+      } catch (err) {
+        msg.textContent = '❌ Network/server error.';
+        msg.className = 'error';
+        console.error(err);
+      }
+    });
   </script>
 </body>
 </html>
