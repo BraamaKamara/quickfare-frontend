@@ -51,27 +51,29 @@
     const BASE = 'https://quickfare-backend.onrender.com';
     let trips = [];
 
-    // 1) Load all public trips and populate the <select>
+    // 1) Load all public trips
     async function loadTrips() {
+      const sel = document.getElementById('tripSelect');
       try {
         const res = await fetch(`${BASE}/api/public-trips`);
         trips = await res.json();
-        const sel = document.getElementById('tripSelect');
         sel.innerHTML = '<option value="">-- Select a trip --</option>';
         trips.forEach(t => {
-          const d = new Date(t.date);
-          sel.innerHTML += `<option value="${t.id}">
-            ${t.origin} ➜ ${t.destination} | ${d.toLocaleDateString()} ${t.time}
-          </option>`;
+          const date = t.date?.split('T')[0] || '—';
+          const time = t.time || '—';
+          const label = `${t.origin} ➜ ${t.destination} | ${date} ${time}`;
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = label;
+          sel.appendChild(opt);
         });
       } catch (err) {
         console.error('Could not load trips', err);
-        document.getElementById('tripSelect').innerHTML =
-          '<option value="">Failed to load trips</option>';
+        sel.innerHTML = '<option value="">Failed to load trips</option>';
       }
     }
 
-    // 2) When a trip is selected, show its details + payment fields
+    // 2) Show details when trip selected
     document.getElementById('tripSelect').addEventListener('change', e => {
       const id = e.target.value;
       const trip = trips.find(t => String(t.id) === id);
@@ -79,14 +81,14 @@
         document.getElementById('paymentForm').style.display = 'none';
         return;
       }
-      document.getElementById('detailOrigin').textContent = trip.origin;
+      document.getElementById('detailOrigin').textContent      = trip.origin;
       document.getElementById('detailDestination').textContent = trip.destination;
-      document.getElementById('detailFare').textContent = trip.fare;
-      document.getElementById('paymentMsg').textContent = '';
-      document.getElementById('paymentForm').style.display = 'block';
+      document.getElementById('detailFare').textContent        = trip.fare;
+      document.getElementById('paymentMsg').textContent        = '';
+      document.getElementById('paymentForm').style.display     = 'block';
     });
 
-    // 3) Confirm Payment handler
+    // 3) Confirm Payment
     document.getElementById('confirmBtn').addEventListener('click', async () => {
       const id     = document.getElementById('tripSelect').value;
       const fare   = document.getElementById('detailFare').textContent;
@@ -113,16 +115,12 @@
           })
         });
 
-        // Try parse JSON if there is any
         let data = {};
         try { data = await res.json(); } catch {}
 
         if (res.ok) {
           msgBox.textContent = '✅ Payment confirmed!';
           msgBox.className = 'success';
-          // Optionally reset form:
-          // document.getElementById('payerPhone').value = '';
-          // document.getElementById('paymentMethod').value = '';
         } else {
           msgBox.textContent = `❌ ${data.message || res.statusText}`;
           msgBox.className = 'error';
@@ -134,7 +132,6 @@
       }
     });
 
-    // Initialize on load
     window.addEventListener('DOMContentLoaded', loadTrips);
   </script>
 </body>
