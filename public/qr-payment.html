@@ -2,137 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>QR Payment</title>
+  <title>QuickFare – Scan QR</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body { font-family: Arial, sans-serif; background:#f4f4f4; padding:20px; }
     .card {
       background:#fff; max-width:400px; margin:auto;
       padding:20px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1);
+      text-align:center;
     }
-    h1 { text-align:center; font-size:1.5em; margin-bottom:1em; }
-    #reader { width:100%; margin-bottom:1em; }
-    .entry { background:#e7f3ff; padding:10px; border-radius:4px; margin-bottom:1em; }
-    .entry b { display:inline-block; width:80px; }
-    .input, button {
-      width:100%; padding:8px; margin:8px 0; box-sizing:border-box;
-      border:1px solid #ccc; border-radius:4px;
-    }
-    button { background:#28a745; color:#fff; border:none; cursor:pointer; }
-    button:disabled { background:#ccc; cursor:not-allowed; }
-    .success { color:green; margin-top:10px; }
-    .error   { color:red;   margin-top:10px; }
+    h1 { margin-bottom:1em; }
+    #reader { width:100%; }
+    .error { color:red; margin-top:10px; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Scan & Pay via QR</h1>
-    <!-- 1) QR Scanner -->
+    <h1>Scan QR to Pay</h1>
     <div id="reader"></div>
     <div id="scanError" class="error"></div>
-
-    <!-- 2) Trip Details + Payment Form -->
-    <div id="paymentSection" style="display:none;">
-      <div class="entry">
-        <div><b>From:</b> <span id="oOrigin"></span></div>
-        <div><b>To:</b> <span id="oDestination"></span></div>
-        <div><b>Fare:</b> ZMW <span id="oFare"></span></div>
-        <div><b>Date:</b> <span id="oDate"></span></div>
-        <div><b>Time:</b> <span id="oTime"></span></div>
-      </div>
-      <input class="input" id="payerPhone" type="text" placeholder="Your phone (e.g. 0978123456)" />
-      <input class="input" id="paymentMethod" type="text" placeholder="Payment method (e.g. MTN)" />
-      <button id="confirmBtn">✅ Confirm Payment</button>
-      <div id="paymentMsg"></div>
-    </div>
   </div>
 
-  <!-- Html5Qrcode for camera+QR scanning -->
+  <!-- Html5Qrcode -->
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script>
-    const BACKEND = 'https://quickfare-backend.onrender.com';
-    let currentData = null;
-
-    // Called when a QR is successfully scanned
-    function onScanSuccess(decodedText, decodedResult) {
-      try {
-        const data = JSON.parse(decodedText);
-        currentData = data;
-      } catch (e) {
-        document.getElementById('scanError').textContent = '❌ Invalid QR payload';
-        return;
-      }
-
-      // stop scanning
-      html5QrcodeScanner.clear().catch(console.error);
-
-      // hide scanner & show form
-      document.getElementById('reader').style.display = 'none';
-      document.getElementById('scanError').textContent = '';
-      const sec = document.getElementById('paymentSection');
-      sec.style.display = 'block';
-
-      // populate details
-      document.getElementById('oOrigin').textContent      = currentData.origin;
-      document.getElementById('oDestination').textContent = currentData.destination;
-      document.getElementById('oFare').textContent        = currentData.fare;
-      document.getElementById('oDate').textContent        = currentData.date.split('T')[0];
-      document.getElementById('oTime').textContent        = currentData.time;
-    }
-
-    function onScanFailure(error) {
-      // no-op (could log to console)
-    }
+    const qrRegionId = "reader";
+    const scanError = document.getElementById("scanError");
 
     // Initialize scanner
-    const html5QrcodeScanner = new Html5Qrcode("reader");
-    html5QrcodeScanner.start(
+    const scanner = new Html5Qrcode(qrRegionId);
+
+    scanner.start(
       { facingMode: "environment" },
       { fps: 10, qrbox: 250 },
-      onScanSuccess,
-      onScanFailure
-    ).catch(err => {
-      document.getElementById('scanError').textContent = '❌ Camera error: ' + err;
-    });
-
-    // Confirm payment click
-    document.getElementById('confirmBtn').addEventListener('click', async () => {
-      const phone  = document.getElementById('payerPhone').value.trim();
-      const method = document.getElementById('paymentMethod').value.trim();
-      const msg    = document.getElementById('paymentMsg');
-      msg.textContent = '';
-
-      if (!phone || !method) {
-        msg.textContent = '❌ Please enter phone & payment method.';
-        msg.className = 'error';
-        return;
-      }
-
-      try {
-        const res = await fetch(`${BACKEND}/api/payments/confirm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tripId:        currentData.tripId,
-            amount:        currentData.fare,
-            phone,
-            paymentMethod: method
-          })
-        });
-        const data = await res.json().catch(() => ({}));
-
-        if (res.ok) {
-          msg.textContent = data.message || '✅ Payment confirmed!';
-          msg.className = 'success';
+      // onScanSuccess
+      decodedText => {
+        // expect a URL like https://…/pay.html?tripId=…
+        if (decodedText.startsWith("http")) {
+          scanner.clear();           // stop camera
+          window.location.href = decodedText;  
         } else {
-          msg.textContent = `❌ ${data.error || data.message || res.statusText}`;
-          msg.className = 'error';
+          scanError.textContent = "❌ Scanned QR is not a URL.";
         }
-      } catch (err) {
-        msg.textContent = '❌ Network/server error.';
-        msg.className = 'error';
-        console.error(err);
+      },
+      // onScanFailure
+      errorMsg => {
+        // console.debug("scan error:", errorMsg);
       }
+    ).catch(err => {
+      scanError.textContent = "❌ Camera error: " + err;
     });
   </script>
 </body>
