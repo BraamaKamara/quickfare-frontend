@@ -26,7 +26,6 @@
   <div class="card">
     <h1>Scan &amp; Go to Payment</h1>
 
-    <!-- user must click this -->
     <button id="btnStart">📷 Start Scanner</button>
     <div id="reader"></div>
     <pre id="debugLog">📟 Waiting for you to tap “Start Scanner”…</pre>
@@ -35,12 +34,12 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.6/html5-qrcode.min.js"></script>
   <script>
-    const btnStart   = document.getElementById('btnStart');
-    const debugLog   = document.getElementById('debugLog');
-    const scanError  = document.getElementById('scanError');
+    const btnStart  = document.getElementById('btnStart');
+    const debugLog  = document.getElementById('debugLog');
+    const scanError = document.getElementById('scanError');
     let   html5QrCode;
 
-    function log(msg){
+    function log(msg) {
       debugLog.textContent += '\n' + msg;
       debugLog.scrollTop = debugLog.scrollHeight;
     }
@@ -49,21 +48,24 @@
       btnStart.disabled = true;
       log('▶️ Start button clicked, initializing cameras…');
       try {
-        const cameras = await Html5Qrcode.getCameras();
-        if (!cameras.length) {
+        const cams = await Html5Qrcode.getCameras();
+        if (!cams.length) {
           scanError.textContent = '❌ No camera found';
-          return log('❌ getCameras: none');
+          return log('❌ getCameras returned empty list');
         }
-        const backCam = cameras.find(c=>/back|rear/i.test(c.label)) || cameras[0];
-        log(`🎥 Using camera: ${ backCam.label }`);
+        // pick back camera if possible
+        const backCam = cams.find(c=>/back|rear/i.test(c.label)) || cams[0];
+        log(`🎥 Using camera: ${backCam.label}`);
 
         html5QrCode = new Html5Qrcode('reader');
+        // ——— CHANGE: pass the camera ID string directly (not object with two keys) ———
         await html5QrCode.start(
-          { deviceId: { exact: backCam.id }, facingMode: "environment" },
-          { fps: 10, qrbox: false, /* full-frame scan */ },
+          backCam.id,                // cameraId string
+          { fps: 10, qrbox: false }, // scan config
           onScanSuccess,
           onScanFailure
         );
+
         log('✅ Scanner started; point it at a QR code.');
       } catch (err) {
         scanError.textContent = '❌ Scanner init error';
@@ -74,16 +76,16 @@
     function onScanSuccess(decodedText, decodedResult){
       log('✅ Decoded: ' + decodedText);
       html5QrCode.pause();
-      // if it’s a JSON payload
+
       try {
         const obj = JSON.parse(decodedText);
         if (obj.tripId) {
-          const url = `${ location.origin }/pay.html?tripId=${ encodeURIComponent(obj.tripId) }`;
+          const url = `${location.origin}/pay.html?tripId=${encodeURIComponent(obj.tripId)}`;
           log('➡️ Redirecting to: ' + url);
           return window.location.href = url;
         }
-        throw new Error('missing tripId');
-      } catch(e){
+        throw new Error('no tripId in payload');
+      } catch(e) {
         scanError.textContent = '❌ Invalid QR payload';
         log('❌ Payload parse error: ' + e);
         html5QrCode.resume();
@@ -91,7 +93,7 @@
     }
 
     function onScanFailure(error){
-      // frame-level scan failures are normal; log for visibility
+      // this is expected often; keep it in logs so you can watch frames
       log('⚠️ No QR in frame: ' + error);
     }
 
