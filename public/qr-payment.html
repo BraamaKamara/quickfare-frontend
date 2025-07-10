@@ -8,12 +8,13 @@
     body {
       font-family: Arial, sans-serif;
       background: #f4f4f4;
-      padding: 20px;
+      padding: 0;
+      margin: 0;
     }
     .card {
       background: #fff;
-      max-width: 420px;
-      margin: auto;
+      max-width: 480px;
+      margin: 1em auto;
       padding: 20px;
       border-radius: 6px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -22,10 +23,10 @@
     h1 {
       margin-bottom: 1em;
     }
-    /* Make the video feed taller so the QR fills more of the frame */
+    /* Make reader fill width and a good chunk of height */
     #reader {
       width: 100%;
-      height: 360px;
+      height: 60vh;
       margin-bottom: 1em;
     }
     #debugLog {
@@ -81,49 +82,41 @@
     }
 
     function onScanFailure(error) {
-      // per-frame failures (no-op)
+      // no-op for per-frame failures
     }
 
-    // 1) Enumerate cameras
+    // 1) Get camera list
     Html5Qrcode.getCameras()
       .then(cameras => {
         if (!cameras || cameras.length === 0) {
           scanError.textContent = '❌ No cameras found';
-          logDebug('❌ No cameras enumerated');
+          logDebug('❌ getCameras(): none');
           return;
         }
-
-        // 2) Pick back-facing camera if available
+        // 2) Pick a back-facing camera if available
         const backCam = cameras.find(c =>
           c.label.toLowerCase().includes('back')
         );
-        const cam       = backCam || cameras[0];
-        const cameraId  = cam.id;
+        const cam      = backCam || cameras[0];
+        const cameraId = cam.id;
         logDebug('🎥 Using camera: ' + cam.label);
 
-        // 3) Build a deviceId constraint for exactly this camera
-        const cameraConfig = { deviceId: { exact: cameraId } };
-        logDebug('📋 Camera config: ' + JSON.stringify(cameraConfig));
-
-        // 4) Start scanning, focusing on a 300×300 box in the center
+        // 3) Start scanning with a 350×350 box
         html5QrCode = new Html5Qrcode('reader');
         html5QrCode.start(
-          cameraConfig,
-          {
-            fps: 10,
-            qrbox: { width: 300, height: 300 }
-          },
+          cameraId, 
+          { fps: 10, qrbox: { width: 350, height: 350 } },
           onScanSuccess,
           onScanFailure
-        ).then(() => {
-          logDebug('✅ Scanner started');
-        }).catch(err => {
-          logDebug('❌ Scanner start error: ' + err);
+        )
+        .then(() => logDebug('✅ Scanner started'))
+        .catch(err => {
+          logDebug('❌ start() error: ' + err);
           scanError.textContent = '❌ ' + err;
         });
       })
       .catch(err => {
-        logDebug('❌ getCameras() error: ' + err);
+        logDebug('❌ getCameras() failed: ' + err);
         scanError.textContent = '❌ Camera init error';
       });
   </script>
