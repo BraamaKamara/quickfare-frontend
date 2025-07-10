@@ -5,19 +5,44 @@
   <title>QuickFare – Scan & Pay QR</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; background:#f4f4f4; padding:20px; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
     .card {
-      background:#fff; max-width:400px; margin:auto;
-      padding:20px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1);
-      text-align:center;
+      background: #fff;
+      max-width: 420px;
+      margin: auto;
+      padding: 20px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      text-align: center;
     }
-    h1 { margin-bottom:1em; }
-    #reader { width:100%; }
+    h1 {
+      margin-bottom: 1em;
+    }
+    /* Make the video feed taller so the QR fills more of the frame */
+    #reader {
+      width: 100%;
+      height: 360px;
+      margin-bottom: 1em;
+    }
     #debugLog {
-      background:#222; color:#0f0; padding:8px; margin-top:10px;
-      max-height:150px; overflow:auto; font-size:12px; text-align:left;
+      background: #222;
+      color: #0f0;
+      padding: 8px;
+      margin-top: 10px;
+      max-height: 150px;
+      overflow: auto;
+      font-size: 12px;
+      text-align: left;
+      white-space: pre-wrap;
     }
-    .error { color:red; margin-top:10px; }
+    .error {
+      color: red;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -36,7 +61,7 @@
     let html5QrCode;
 
     function logDebug(msg) {
-      debugLog.textContent += '\n' + msg;
+      debugLog.textContent += '\\n' + msg;
     }
 
     function onScanSuccess(decodedText, decodedResult) {
@@ -56,9 +81,10 @@
     }
 
     function onScanFailure(error) {
-      // ignore or log per‐frame failures
+      // per-frame failures (no-op)
     }
 
+    // 1) Enumerate cameras
     Html5Qrcode.getCameras()
       .then(cameras => {
         if (!cameras || cameras.length === 0) {
@@ -66,25 +92,38 @@
           logDebug('❌ No cameras enumerated');
           return;
         }
-        const backCam = cameras.find(c => c.label.toLowerCase().includes('back'));
-        const camId    = backCam ? backCam.id : cameras[0].id;
-        logDebug('🎥 Using camera: ' + (backCam ? backCam.label : cameras[0].label));
 
+        // 2) Pick back-facing camera if available
+        const backCam = cameras.find(c =>
+          c.label.toLowerCase().includes('back')
+        );
+        const cam       = backCam || cameras[0];
+        const cameraId  = cam.id;
+        logDebug('🎥 Using camera: ' + cam.label);
+
+        // 3) Build a deviceId constraint for exactly this camera
+        const cameraConfig = { deviceId: { exact: cameraId } };
+        logDebug('📋 Camera config: ' + JSON.stringify(cameraConfig));
+
+        // 4) Start scanning, focusing on a 300×300 box in the center
         html5QrCode = new Html5Qrcode('reader');
         html5QrCode.start(
-          camId,
-          { fps: 10 },           // <-- no qrbox, scan full view
+          cameraConfig,
+          {
+            fps: 10,
+            qrbox: { width: 300, height: 300 }
+          },
           onScanSuccess,
           onScanFailure
         ).then(() => {
           logDebug('✅ Scanner started');
         }).catch(err => {
-          logDebug('❌ Start error: ' + err);
+          logDebug('❌ Scanner start error: ' + err);
           scanError.textContent = '❌ ' + err;
         });
       })
       .catch(err => {
-        logDebug('❌ getCameras error: ' + err);
+        logDebug('❌ getCameras() error: ' + err);
         scanError.textContent = '❌ Camera init error';
       });
   </script>
