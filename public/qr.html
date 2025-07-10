@@ -5,84 +5,58 @@
   <title>Generate QR for Trip</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; padding:20px; }
-    .card {
-      background:#fff; max-width:400px; margin:auto;
-      padding:20px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1);
-    }
-    h1 { font-size:1.5em; margin-bottom:1em; text-align:center; }
-    label, select, button { display:block; width:100%; margin-bottom:10px; }
-    select, button { padding:8px; font-size:1em; border-radius:4px; border:1px solid #ccc; }
-    button { background:#007BFF; color:#fff; border:none; cursor:pointer; }
-    button:disabled { background:#ccc; cursor:not-allowed; }
-    #qrCanvas { display:block; margin:20px auto; }
-    .error { color:red; text-align:center; margin-top:10px; }
+    /* …same styles as before… */
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Generate QR for Trip</h1>
-    <label for="tripSelect">Select Trip:</label>
-    <select id="tripSelect">
-      <option>Loading trips…</option>
-    </select>
+    <select id="tripSelect"><option>Loading trips…</option></select>
     <button id="generateBtn" disabled>Generate QR</button>
     <canvas id="qrCanvas"></canvas>
     <div id="errorMsg" class="error"></div>
   </div>
 
-  <!-- QRious for QR code generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <script>
     const BACKEND = 'https://quickfare-backend.onrender.com';
     let trips = [];
 
-    // Fetch public trips
     async function loadTrips() {
-      const sel = document.getElementById('tripSelect');
-      const err = document.getElementById('errorMsg');
-      err.textContent = '';
       try {
-        const res  = await fetch(`${BACKEND}/api/public-trips`);
-        if (!res.ok) throw new Error(res.status);
+        const res = await fetch(`${BACKEND}/api/public-trips`);
         trips = await res.json();
-
+        const sel = document.getElementById('tripSelect');
         sel.innerHTML = '<option value="">-- Select a trip --</option>';
         trips.forEach(t => {
-          const date = t.date.split('T')[0];
-          const time = t.time;
+          const date = t.date.split('T')[0], time = t.time;
           const label = `${t.origin} ➜ ${t.destination} | ${date} ${time}`;
-          const opt = document.createElement('option');
-          opt.value = t.id;
-          opt.textContent = label;
-          sel.appendChild(opt);
+          const o = new Option(label, t.id);
+          sel.add(o);
         });
-      } catch (e) {
-        console.error(e);
-        sel.innerHTML = '<option>Could not load trips</option>';
-        err.textContent = '❌ Unable to load trips.';
+      } catch {
+        document.getElementById('errorMsg').textContent =
+          '❌ Could not load trips.';
       }
     }
 
-    // Enable “Generate” when a trip is chosen
-    document.getElementById('tripSelect').addEventListener('change', e => {
-      document.getElementById('generateBtn').disabled = !e.target.value;
-      document.getElementById('errorMsg').textContent = '';
-      document.getElementById('qrCanvas').style.display = 'none';
-    });
-
-    // Build a URL QR pointing to pay.html?tripId=<id>
-    document.getElementById('generateBtn').addEventListener('click', () => {
-      const id   = document.getElementById('tripSelect').value;
-      if (!id) return;
-      const url  = `${window.location.origin}/pay.html?tripId=${id}`;
-      const qr   = new QRious({
-        element: document.getElementById('qrCanvas'),
-        value:   url,
-        size:    250
+    document.getElementById('tripSelect')
+      .addEventListener('change', e => {
+        document.getElementById('generateBtn').disabled = !e.target.value;
+        document.getElementById('qrCanvas').style.display = 'none';
       });
-      document.getElementById('qrCanvas').style.display = 'block';
-    });
+
+    document.getElementById('generateBtn')
+      .addEventListener('click', () => {
+        const id = document.getElementById('tripSelect').value;
+        const url = `${location.origin}/pay.html?tripId=${id}`;
+        new QRious({
+          element: document.getElementById('qrCanvas'),
+          value:   url,
+          size:    250
+        });
+        document.getElementById('qrCanvas').style.display = 'block';
+      });
 
     window.addEventListener('DOMContentLoaded', loadTrips);
   </script>
