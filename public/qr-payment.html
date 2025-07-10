@@ -2,47 +2,39 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>QuickFare – Scan & Pay QR</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QuickFare – Scan & Go to Payment</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      padding: 0;
-      margin: 0;
-    }
+    body { margin:0; padding:0; font-family: Arial, sans-serif; background:#f4f4f4; }
     .card {
-      background: #fff;
-      max-width: 480px;
-      margin: 1em auto;
-      padding: 20px;
-      border-radius: 6px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      text-align: center;
+      max-width:480px;
+      margin:1em auto;
+      background:#fff;
+      border-radius:6px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.1);
+      padding:20px;
+      text-align:center;
     }
-    h1 {
-      margin-bottom: 1em;
-    }
-    /* Make reader fill width and a good chunk of height */
+    h1 { margin-bottom:1em; }
     #reader {
-      width: 100%;
-      height: 60vh;
-      margin-bottom: 1em;
+      width:100%;
+      height:60vh;
+      margin-bottom:1em;
     }
     #debugLog {
-      background: #222;
-      color: #0f0;
-      padding: 8px;
-      margin-top: 10px;
-      max-height: 150px;
-      overflow: auto;
-      font-size: 12px;
-      text-align: left;
-      white-space: pre-wrap;
+      background:#222;
+      color:#0f0;
+      font-size:12px;
+      text-align:left;
+      padding:8px;
+      max-height:150px;
+      overflow:auto;
+      white-space:pre-wrap;
+      margin-top:10px;
     }
-    .error {
-      color: red;
-      margin-top: 10px;
+    #scanError {
+      color:red;
+      margin-top:8px;
     }
   </style>
 </head>
@@ -51,73 +43,82 @@
     <h1>Scan &amp; Go to Payment</h1>
     <div id="reader"></div>
     <pre id="debugLog">📟 Waiting for scans…</pre>
-    <div id="scanError" class="error"></div>
+    <div id="scanError"></div>
   </div>
 
-  <!-- html5-qrcode library -->
+  <!-- html5-qrcode -->
   <script src="https://unpkg.com/html5-qrcode@2.3.6/html5-qrcode.min.js"></script>
   <script>
+    const debugLog = document.getElementById('debugLog');
     const scanError = document.getElementById('scanError');
-    const debugLog   = document.getElementById('debugLog');
     let html5QrCode;
 
-    function logDebug(msg) {
+    function log(msg) {
       debugLog.textContent += '\\n' + msg;
     }
 
     function onScanSuccess(decodedText, decodedResult) {
-      logDebug('✅ Decoded: ' + decodedText);
+      log('✅ Decoded: ' + decodedText);
+      // Pause scanning while we redirect or handle error
+      html5QrCode.pause().catch(()=>{});
+      // 1) If URL, go there directly
       if (decodedText.startsWith('http')) {
-        html5QrCode
-          .stop()
-          .then(() => window.location.href = decodedText)
-          .catch(err => {
-            logDebug('❌ Stop failed: ' + err);
-            scanError.textContent = '❌ ' + err;
-          });
-      } else {
-        scanError.textContent = '❌ Scanned text is not a URL.';
-        logDebug('⚠️ Not a URL: ' + decodedText);
+        log('➡️ Redirecting to URL');
+        window.location.href = decodedText;
+        return;
+      }
+      // 2) Try JSON payload
+      try {
+        const obj = JSON.parse(decodedText);
+        if (obj.tripId) {
+          const url = `${location.origin}/pay.html?tripId=${encodeURIComponent(obj.tripId)}`;
+          log('➡️ Redirecting to: ' + url);
+          window.location.href = url;
+          return;
+        }
+        throw new Error('Missing tripId');
+      } catch (err) {
+        scanError.textContent = '❌ Invalid QR payload';
+        log('❌ Invalid payload: ' + err);
+        // resume scanning
+        html5QrCode.resume().catch(()=>{});
       }
     }
 
     function onScanFailure(error) {
-      // no-op for per-frame failures
+      // Log every frame-level error
+      log('⚠️ scan error: ' + error);
     }
 
-    // 1) Get camera list
+    // Initialize camera + QR reader
     Html5Qrcode.getCameras()
       .then(cameras => {
         if (!cameras || cameras.length === 0) {
           scanError.textContent = '❌ No cameras found';
-          logDebug('❌ getCameras(): none');
+          log('❌ getCameras(): none');
           return;
         }
-        // 2) Pick a back-facing camera if available
-        const backCam = cameras.find(c =>
-          c.label.toLowerCase().includes('back')
-        );
-        const cam      = backCam || cameras[0];
-        const cameraId = cam.id;
-        logDebug('🎥 Using camera: ' + cam.label);
+        // Prefer a back-facing camera if labeled
+        const backCam = cameras.find(c=>c.label.toLowerCase().includes('back'));
+        const cam     = backCam || cameras[0];
+        log('🎥 Using camera: ' + cam.label);
 
-        // 3) Start scanning with a 350×350 box
         html5QrCode = new Html5Qrcode('reader');
         html5QrCode.start(
-          cameraId, 
-          { fps: 10, qrbox: { width: 350, height: 350 } },
+          cam.id,
+          { fps: 10, qrbox: { width: 300, height: 300 } },
           onScanSuccess,
           onScanFailure
         )
-        .then(() => logDebug('✅ Scanner started'))
+        .then(() => log('✅ Scanner started'))
         .catch(err => {
-          logDebug('❌ start() error: ' + err);
-          scanError.textContent = '❌ ' + err;
+          scanError.textContent = '❌ Scanner failed to start';
+          log('❌ start() error: ' + err);
         });
       })
       .catch(err => {
-        logDebug('❌ getCameras() failed: ' + err);
         scanError.textContent = '❌ Camera init error';
+        log('❌ getCameras() error: ' + err);
       });
   </script>
 </body>
