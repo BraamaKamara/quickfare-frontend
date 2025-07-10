@@ -12,67 +12,87 @@
       text-align:center;
     }
     h1 { margin-bottom:1em; }
-    #reader { width:100%; height: auto; }
+    #reader { width:100%; }
+    #debugLog {
+      background:#222; color:#0f0; padding:8px; margin-top:10px;
+      max-height:150px; overflow:auto; font-size:12px; text-align:left;
+    }
     .error { color:red; margin-top:10px; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Scan & Pay</h1>
+    <h1>Scan &amp; Go to Payment</h1>
     <div id="reader"></div>
+    <pre id="debugLog">📟 Waiting for scans…</pre>
     <div id="scanError" class="error"></div>
   </div>
 
-  <!-- html5-qrcode -->
+  <!-- html5-qrcode library -->
   <script src="https://unpkg.com/html5-qrcode@2.3.6/html5-qrcode.min.js"></script>
   <script>
     const scanError = document.getElementById('scanError');
+    const debugLog   = document.getElementById('debugLog');
     let html5QrCode;
+
+    function logDebug(msg) {
+      debugLog.textContent += '\\n' + msg;
+    }
 
     function onScanSuccess(decodedText, decodedResult) {
       console.log('QR decoded:', decodedText);
+      logDebug('✅ Decoded: ' + decodedText);
       if (decodedText.startsWith('http')) {
         html5QrCode
           .stop()
           .then(() => window.location.href = decodedText)
-          .catch(err => console.error('Stop failed:', err));
+          .catch(err => {
+            console.error('Stop failed:', err);
+            logDebug('❌ Stop failed: ' + err);
+            scanError.textContent = '❌ ' + err;
+          });
       } else {
         scanError.textContent = '❌ Scanned text is not a URL.';
+        logDebug('⚠️ Not a URL: ' + decodedText);
       }
     }
 
     function onScanFailure(error) {
-      // errors per scan; ignore or log
-      // console.debug('Scan error:', error);
+      // Every failed scan attempt; you can uncomment to debug
+      // console.debug('Scan failure:', error);
     }
 
-    // Start scanning
+    // Initialize camera & scanner
     Html5Qrcode.getCameras()
       .then(cameras => {
         if (!cameras || cameras.length === 0) {
           scanError.textContent = '❌ No cameras found';
+          logDebug('❌ No cameras enumerated');
           return;
         }
-        // Try to pick a back camera; fallback to first
-        const backCamera = cameras.find(cam =>
-          cam.label.toLowerCase().includes('back')
-        );
-        const cameraId = backCamera ? backCamera.id : cameras[0].id;
+        // pick back camera if available
+        const backCam = cameras.find(c => c.label.toLowerCase().includes('back'));
+        const camId    = backCam ? backCam.id : cameras[0].id;
+        logDebug('🎥 Using camera: ' + (backCam ? backCam.label : cameras[0].label));
 
         html5QrCode = new Html5Qrcode('reader');
         html5QrCode.start(
-          cameraId,
+          camId,
           { fps: 10, qrbox: 250 },
           onScanSuccess,
           onScanFailure
-        ).catch(err => {
+        ).then(() => {
+          logDebug('✅ Scanner started');
+        }).catch(err => {
           console.error('Scanner start error:', err);
           scanError.textContent = '❌ Unable to start scanner: ' + err;
+          logDebug('❌ Start error: ' + err);
         });
       })
       .catch(err => {
         console.error('getCameras() error:', err);
-        scanError.textContent = '❌ Camera initialization error';
+        scanError.textContent = '❌ Camera init error';
+        logDebug('❌ getCameras error: ' + err);
       });
   </script>
 </body>
