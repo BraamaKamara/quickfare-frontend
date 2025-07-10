@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>QuickFare – Scan QR</title>
+  <title>QuickFare – Scan & Pay QR</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body { font-family: Arial, sans-serif; background:#f4f4f4; padding:20px; }
@@ -18,40 +18,39 @@
 </head>
 <body>
   <div class="card">
-    <h1>Scan QR to Pay</h1>
+    <h1>Scan & Go to Payment</h1>
+    <!-- This div will be replaced by the scanner UI -->
     <div id="reader"></div>
     <div id="scanError" class="error"></div>
   </div>
 
-  <!-- Html5Qrcode -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- Use the Html5QrcodeScanner from html5-qrcode v2.x -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.6/html5-qrcode.min.js"></script>
   <script>
-    const qrRegionId = "reader";
     const scanError = document.getElementById("scanError");
-
-    // Initialize scanner
-    const scanner = new Html5Qrcode(qrRegionId);
-
-    scanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
-      // onScanSuccess
-      decodedText => {
-        // expect a URL like https://…/pay.html?tripId=…
-        if (decodedText.startsWith("http")) {
-          scanner.clear();           // stop camera
-          window.location.href = decodedText;  
-        } else {
-          scanError.textContent = "❌ Scanned QR is not a URL.";
-        }
-      },
-      // onScanFailure
-      errorMsg => {
-        // console.debug("scan error:", errorMsg);
+    // Called when a QR is successfully scanned
+    function onScanSuccess(decodedText, decodedResult) {
+      if (decodedText.startsWith("http")) {
+        html5QrcodeScanner.clear().then(() => {
+          window.location.href = decodedText;
+        });
+      } else {
+        scanError.textContent = "❌ Scanned QR is not a URL.";
       }
-    ).catch(err => {
-      scanError.textContent = "❌ Camera error: " + err;
-    });
+    }
+    // Called on scan failure; we'll ignore most failures
+    function onScanFailure(error) {
+      // console.debug("QR scan failure", error);
+    }
+
+    // Create the scanner: 10fps, 250px box
+    const html5QrcodeScanner = new Html5QrcodeScanner(
+      "reader",
+      { fps: 10, qrbox: 250 },
+      /* verbose= */ false
+    );
+    // Render it into #reader
+    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
   </script>
 </body>
 </html>
