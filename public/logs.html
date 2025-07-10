@@ -1,109 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>QuickFare – View Logs</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>QuickFare Payment Logs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
-    body { font-family: Arial, sans-serif; background:#f4f4f4; padding:20px; }
-    .card {
-      background:#fff; max-width:400px; margin:auto;
-      padding:20px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1);
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
+    h1 { text-align: center; margin-bottom: 1rem; }
+    #message {
+      max-width: 600px;
+      margin: 0 auto 1rem;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
     }
-    h1 { text-align:center; margin-bottom:1em; }
-    label, select, input, button {
-      width:100%; margin:8px 0; padding:8px; box-sizing:border-box;
-      border:1px solid #ccc; border-radius:4px;
-    }
-    button { background:#007BFF; color:#fff; border:none; cursor:pointer; }
-    button:disabled { background:#ccc; cursor:not-allowed; }
-    .entry { background:#e7f3ff; padding:10px; border-radius:4px; margin-top:1em; }
-    .success { color:green; }
-    .error   { color:red; }
+    #message.error { background: #ffe6e6; color: #900; border: 1px solid #f5c2c2; }
+    #message.success { background: #e6ffed; color: #090; border: 1px solid #c2f5c2; }
+    #loginForm, #logsSection { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 6px; }
+    #loginForm input { width: 100%; padding: 10px; margin: 8px 0; font-size: 1rem; }
+    #loginForm button { padding: 10px 20px; font-size: 1rem; }
+    #logoutBtn { float: right; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+    th { background: #007BFF; color: #fff; }
+    tr:nth-child(even) { background: #fafafa; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>View Payment Logs</h1>
 
-    <label for="tripSelect">Select Trip:</label>
-    <select id="tripSelect">
-      <option>Loading trips…</option>
-    </select>
+  <h1>QuickFare Payment Logs</h1>
 
-    <label for="phoneInput">Customer Phone:</label>
-    <input type="text" id="phoneInput" placeholder="e.g. 0978123456" />
+  <div id="message"></div>
 
-    <button id="checkBtn" disabled>✅ Check Payment</button>
+  <section id="loginForm">
+    <h2>🔐 Admin Login</h2>
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Password" required />
+    <button id="loginBtn">Login</button>
+  </section>
 
-    <div id="result"></div>
-  </div>
+  <section id="logsSection" style="display:none;">
+    <button id="logoutBtn">🚪 Logout</button>
+    <h2>📋 Recent Payments</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Trip</th>
+          <th>Amount</th>
+          <th>Phone</th>
+          <th>Status</th>
+          <th>Method</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody id="paymentTableBody">
+        <tr><td colspan="6">Loading…</td></tr>
+      </tbody>
+    </table>
+  </section>
 
   <script>
-    const BASE = 'https://quickfare-backend.onrender.com';
-    let trips = [];
+    const BASE_URL = 'https://quickfare-backend.onrender.com';
+    const msgEl = document.getElementById('message');
+    const loginForm = document.getElementById('loginForm');
+    const logsSection = document.getElementById('logsSection');
+    const emailInput = document.getElementById('email');
+    const passInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const tbody = document.getElementById('paymentTableBody');
 
-    // 1) Load public trips into selector
-    async function loadTrips() {
-      const sel = document.getElementById('tripSelect');
+    function showMessage(text, type = 'error') {
+      msgEl.textContent = text;
+      msgEl.className = type;
+      msgEl.style.display = 'block';
+    }
+    function clearMessage() {
+      msgEl.style.display = 'none';
+    }
+
+    async function login() {
+      clearMessage();
+      const email = emailInput.value.trim();
+      const password = passInput.value.trim();
+      if (!email || !password) {
+        return showMessage('Please enter both email and password.');
+      }
       try {
-        const res = await fetch(`${BASE}/api/public-trips`);
-        trips = await res.json();
-        sel.innerHTML = '<option value="">-- Select a trip --</option>';
-        trips.forEach(t => {
-          const date = t.date.split('T')[0];
-          const time = t.time;
-          const opt = document.createElement('option');
-          opt.value = t.id;
-          opt.textContent = `${t.origin} ➜ ${t.destination} | ${date} ${time}`;
-          sel.appendChild(opt);
+        const res = await fetch(`${BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ email, password })
         });
-      } catch (e) {
-        sel.innerHTML = '<option>Failed to load trips</option>';
-        console.error(e);
-      }
-    }
-
-    // 2) Enable the “Check” button once both fields have values
-    function updateButtonState() {
-      const trip   = document.getElementById('tripSelect').value;
-      const phone  = document.getElementById('phoneInput').value.trim();
-      document.getElementById('checkBtn').disabled = !(trip && phone);
-    }
-    document.getElementById('tripSelect').addEventListener('change', updateButtonState);
-    document.getElementById('phoneInput').addEventListener('input', updateButtonState);
-
-    // 3) On Check click, hit the “/api/payments/check” endpoint
-    document.getElementById('checkBtn').addEventListener('click', async () => {
-      const tripId = document.getElementById('tripSelect').value;
-      const phone  = document.getElementById('phoneInput').value.trim();
-      const resDiv = document.getElementById('result');
-      resDiv.textContent = '';
-
-      try {
-        const res = await fetch(`${BASE}/api/payments/check?tripId=${tripId}&phone=${encodeURIComponent(phone)}`);
-        const data = await res.json().catch(() => ({}));
-
-        if (res.ok) {
-          resDiv.innerHTML = `
-            <div class="entry success">
-              <strong>✅ Payment found!</strong><br>
-              Amount: ZMW ${data.payment.amount || data.payment.amountPaid}<br>
-              Method: ${data.payment.paymentMethod || data.payment.method}<br>
-              At: ${new Date(data.payment.createdAt).toLocaleString()}
-            </div>
-          `;
-        } else {
-          resDiv.innerHTML = `<div class="entry error">❌ ${data.message || data.error}</div>`;
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || 'Login failed.');
         }
+        localStorage.setItem('quickfareToken', data.token);
+        emailInput.value = passInput.value = '';
+        initLoggedIn();
       } catch (err) {
-        console.error(err);
-        resDiv.innerHTML = `<div class="entry error">❌ Network/server error.</div>`;
+        showMessage(err.message, 'error');
       }
-    });
+    }
 
-    // Initialize
-    window.addEventListener('DOMContentLoaded', loadTrips);
+    function logout() {
+      localStorage.removeItem('quickfareToken');
+      logsSection.style.display = 'none';
+      loginForm.style.display = 'block';
+      clearMessage();
+    }
+
+    async function loadPayments() {
+      clearMessage();
+      tbody.innerHTML = '<tr><td colspan="6">Loading…</td></tr>';
+      const token = localStorage.getItem('quickfareToken');
+      try {
+        const res = await fetch(`${BASE_URL}/api/payments`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({message:res.statusText}));
+          throw new Error(err.message || 'Failed to load payments.');
+        }
+        const payments = await res.json();
+        if (!payments.length) {
+          tbody.innerHTML = '<tr><td colspan="6">No payments found.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = payments.map(p => {
+          const trip = p.trip || {};
+          const route = trip.route || {};
+          const origin = route.origin || trip.origin || 'N/A';
+          const dest   = route.destination || trip.destination || 'N/A';
+          const amt    = p.amountPaid ?? 'N/A';
+          const phone  = p.payerPhone ?? 'N/A';
+          const method = p.paymentMethod ?? 'N/A';
+          const status = p.status ?? 'N/A';
+          const date   = p.createdAt
+                         ? new Date(p.createdAt).toLocaleString()
+                         : 'N/A';
+
+          return `<tr>
+            <td>${origin} → ${dest}</td>
+            <td>ZMW ${amt}</td>
+            <td>${phone}</td>
+            <td>${status}</td>
+            <td>${method}</td>
+            <td>${date}</td>
+          </tr>`;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="6">Error loading payments.</td></tr>';
+        showMessage(err.message, 'error');
+      }
+    }
+
+    function initLoggedIn() {
+      clearMessage();
+      loginForm.style.display = 'none';
+      logsSection.style.display = 'block';
+      loadPayments();
+    }
+
+    loginBtn.addEventListener('click', login);
+    logoutBtn.addEventListener('click', logout);
+
+    // Auto-login if we already have a token
+    if (localStorage.getItem('quickfareToken')) {
+      initLoggedIn();
+    }
   </script>
 </body>
 </html>
