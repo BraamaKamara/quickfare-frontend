@@ -25,27 +25,23 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     #checkForm > * { margin: 0.5rem 0; }
-    button, select, input {
-      font-size: 1rem;
-    }
     select, input[type="tel"] {
       width: 100%;
       padding: 10px;
       box-sizing: border-box;
+      font-size: 1rem;
     }
     button {
       padding: 10px 20px;
+      font-size: 1rem;
       cursor: pointer;
     }
-    #scanner {
-      width: 100%;
-      max-width: 400px;
-      margin: 1rem auto;
-    }
+    #scanner { width: 100%; max-width: 400px; margin: 1rem auto; }
     #result { margin-top: 1rem; font-weight: bold; }
   </style>
-  <!-- html5-qrcode library for scanning -->
-  <script src="https://unpkg.com/html5-qrcode@latest/dist/html5-qrcode.min.js"></script>
+
+  <!-- 1) Html5Qrcode from unpkg -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
   <h1>🔍 Check Passenger Payment</h1>
@@ -70,18 +66,18 @@
 
   <script>
     const BASE = 'https://quickfare-backend.onrender.com';
-    const msgEl     = document.getElementById('message');
-    const scannerEl = document.getElementById('scanner');
-    const startBtn  = document.getElementById('startScanBtn');
-    const tripSelect= document.getElementById('tripSelect');
-    const phoneIn   = document.getElementById('phoneInput');
-    const checkBtn  = document.getElementById('checkBtn');
-    const resultEl  = document.getElementById('result');
+    const msgEl      = document.getElementById('message');
+    const scannerEl  = document.getElementById('scanner');
+    const startBtn   = document.getElementById('startScanBtn');
+    const tripSelect = document.getElementById('tripSelect');
+    const phoneIn    = document.getElementById('phoneInput');
+    const checkBtn   = document.getElementById('checkBtn');
+    const resultEl   = document.getElementById('result');
     let html5Scanner = null;
 
     function showMessage(text, type='error') {
       msgEl.textContent = text;
-      msgEl.className = type;
+      msgEl.className   = type;
       msgEl.style.display = 'block';
     }
     function clearMessage() {
@@ -91,7 +87,7 @@
       resultEl.textContent = '';
     }
 
-    // 1) Load trips into dropdown
+    // Load trips from public endpoint
     async function loadTrips() {
       tripSelect.innerHTML = '<option>Loading…</option>';
       try {
@@ -115,23 +111,26 @@
       }
     }
 
-    // 2) Kick off QR scanner
+    // Kick off QR scanner
     startBtn.addEventListener('click', () => {
       clearMessage(); clearResult();
+      if (!window.Html5Qrcode) {
+        return showMessage('❌ QR library failed to load', 'error');
+      }
       if (!html5Scanner) {
         html5Scanner = new Html5Qrcode("scanner");
       }
       startBtn.disabled = true;
       scannerEl.style.display = 'block';
-      const config = { fps: 10, qrbox: 250 };
+
       Html5Qrcode.getCameras()
         .then(cameras => {
           const cameraId = cameras[0].id;
           html5Scanner.start(
             cameraId,
-            config,
-            (decoded) => {
-              // on success
+            { fps: 10, qrbox: 250 },
+            decoded => {
+              // parse the JSON encoded in your QR
               try {
                 const obj = JSON.parse(decoded);
                 if (obj.id) {
@@ -147,21 +146,22 @@
               scannerEl.style.display = 'none';
               startBtn.disabled = false;
             },
-            (err) => {
-              // ignore scan errors
+            () => {
+              // scan failure, ignore
             }
-          ).catch(err => {
+          )
+          .catch(err => {
             showMessage('❌ Scanner error: ' + err, 'error');
             startBtn.disabled = false;
           });
         })
         .catch(err => {
-          showMessage('❌ Could not access camera', 'error');
+          showMessage('❌ Camera access denied', 'error');
           startBtn.disabled = false;
         });
     });
 
-    // 3) Check payment
+    // Check payment
     checkBtn.addEventListener('click', async () => {
       clearMessage(); clearResult();
       const tripId = tripSelect.value;
@@ -183,15 +183,15 @@
         }
         if (!res.ok) throw new Error('Error checking payment');
         const data = await res.json();
-        resultEl.textContent = 
-          `✅ Payment found! Amount: ZMW ${data.payment.amountPaid}, ` +
-          `Method: ${data.payment.paymentMethod}, Status: ${data.payment.status}`;
+        resultEl.textContent =
+          `✅ Payment found: ZMW ${data.payment.amountPaid} — ` +
+          `${data.payment.paymentMethod} (${data.payment.status})`;
       } catch (err) {
         showMessage(err.message, 'error');
       }
     });
 
-    // initialize
+    // On load
     loadTrips();
   </script>
 </body>
