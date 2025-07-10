@@ -1,141 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>🔍 Check Passenger Payment</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
     h1 { text-align: center; }
-    .section { background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); max-width: 500px; margin: 0 auto; }
-    label, button, select, input { display: block; width: 100%; margin: 10px 0; }
-    select, input { padding: 8px; font-size: 1rem; }
-    button { padding: 10px; font-size: 1rem; cursor: pointer; }
+    .section {
+      max-width: 500px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    label, select, input, button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      font-size: 1rem;
+    }
+    select, input { padding: 8px; }
+    button { padding: 10px; cursor: pointer; }
     #scanner { margin-top: 20px; }
     #message { margin-top: 20px; font-size: 1rem; }
     #message.success { color: green; }
     #message.error   { color: red; }
   </style>
-  <!-- HTML5 QR code library -->
+
+  <!-- HTML5-QRCode (make sure this loads before our script!) -->
   <script src="https://unpkg.com/html5-qrcode@2.3.7/minified/html5-qrcode.min.js"></script>
 </head>
 <body>
   <h1>🔍 Check Passenger Payment</h1>
   <div class="section">
     <button id="scanBtn">📷 Scan Trip QR</button>
+
     <label for="tripSelect">Or select trip:</label>
     <select id="tripSelect">
-      <option value="">Loading trips…</option>
+      <option>Loading trips…</option>
     </select>
 
     <label for="phoneInput">Passenger Phone:</label>
-    <input type="text" id="phoneInput" placeholder="e.g. 0978123456" />
+    <input type="text" id="phoneInput" placeholder="e.g. 0978123456">
 
     <button id="checkBtn">✅ Check Payment</button>
 
     <div id="message"></div>
-
-    <!-- Scanner viewport (hidden until you click Scan) -->
     <div id="scanner" style="display:none;"></div>
   </div>
 
   <script>
-    const BASE_URL = 'https://quickfare-backend.onrender.com';
-    const tripSelect  = document.getElementById('tripSelect');
-    const phoneInput  = document.getElementById('phoneInput');
-    const scanBtn     = document.getElementById('scanBtn');
-    const checkBtn    = document.getElementById('checkBtn');
-    const messageEl   = document.getElementById('message');
-    const scannerEl   = document.getElementById('scanner');
-    let html5Scanner;
+    const BACKEND = 'https://quickfare-backend.onrender.com';
+    const tripSelect = document.getElementById('tripSelect');
+    const phoneInput = document.getElementById('phoneInput');
+    const scanBtn    = document.getElementById('scanBtn');
+    const checkBtn   = document.getElementById('checkBtn');
+    const msgEl      = document.getElementById('message');
+    const scannerEl  = document.getElementById('scanner');
+    let scanner;
 
-    // Utility
     function showMessage(txt, type='error') {
-      messageEl.textContent = txt;
-      messageEl.className = type;
+      msgEl.textContent = txt;
+      msgEl.className = type;
     }
     function clearMessage() {
-      showMessage('');
+      msgEl.textContent = '';
+      msgEl.className = '';
     }
 
-    // 1. Load trips for the dropdown
+    // 1) Load trips into the dropdown
     async function loadTrips() {
       try {
-        const res = await fetch(`${BASE_URL}/api/public-trips`);
-        if (!res.ok) throw new Error('Failed to load trips');
+        const res = await fetch(`${BACKEND}/api/public-trips`);
+        if (!res.ok) throw new Error('Failed to fetch trips');
         const trips = await res.json();
-        tripSelect.innerHTML = '<option value="">-- Select a trip --</option>'
-          + trips.map(t => `<option value="${t.id}">${t.origin} → ${t.destination} | ${new Date(t.date).toLocaleDateString()} ${t.time}</option>`).join('');
-      } catch (err) {
-        tripSelect.innerHTML = '<option value="">❌ Could not load trips</option>';
-        console.error(err);
+        tripSelect.innerHTML = '<option value="">-- Select a trip --</option>' +
+          trips.map(t =>
+            `<option value="${t.id}">${t.origin} → ${t.destination} | ${new Date(t.date).toLocaleDateString()} ${t.time}</option>`
+          ).join('');
+      } catch (e) {
+        console.error(e);
+        tripSelect.innerHTML = '<option>❌ Could not load trips</option>';
       }
     }
 
-    // 2. Start camera & QR scanner (back camera only)
+    // 2) Scan QR (back camera only)
     scanBtn.addEventListener('click', () => {
       clearMessage();
       scanBtn.disabled = true;
       scannerEl.style.display = 'block';
-      html5Scanner = html5Scanner || new Html5Qrcode('scanner');
+      scanner = scanner || new Html5Qrcode('scanner');
 
-      html5Scanner.start(
-        { facingMode: 'environment' },    // ← force back camera
+      scanner.start(
+        { facingMode: 'environment' },
         { fps: 10, qrbox: 250 },
-        decodedText => {
-          // on success
+        text => {
           try {
-            const obj = JSON.parse(decodedText);
+            const obj = JSON.parse(text);
             if (obj.id) {
               tripSelect.value = obj.id;
-              showMessage('✅ Trip selected from QR', 'success');
-            } else {
-              throw new Error();
-            }
+              showMessage('✅ Trip selected via QR', 'success');
+            } else throw 0;
           } catch {
             showMessage('⚠️ Invalid QR payload');
           }
-          html5Scanner.stop();
+          scanner.stop();
           scannerEl.style.display = 'none';
           scanBtn.disabled = false;
         },
-        errorMsg => {
-          // optionally handle scan failures
-          // console.log('Scan fail:', errorMsg);
+        err => {
+          /* ignore decode errors */
         }
       ).catch(err => {
-        showMessage('❌ Scanner init error: ' + err);
+        console.error(err);
+        showMessage('❌ Scanner error: ' + err);
         scannerEl.style.display = 'none';
         scanBtn.disabled = false;
       });
     });
 
-    // 3. Check payment on button click
+    // 3) Check Payment
     checkBtn.addEventListener('click', async () => {
       clearMessage();
       const tripId = tripSelect.value;
       const phone  = phoneInput.value.trim();
-
       if (!tripId || !phone) {
-        return showMessage('Please select a trip and enter a phone number.');
+        return showMessage('Please select a trip and enter phone.');
       }
 
       try {
-        const res = await fetch(`${BASE_URL}/api/payments/check?tripId=${tripId}&phone=${phone}`);
+        const res = await fetch(
+          `${BACKEND}/api/payments/check?tripId=${tripId}&phone=${encodeURIComponent(phone)}`
+        );
         if (res.ok) {
           const data = await res.json();
-          showMessage(`✅ Payment found: ${data.payment.paymentMethod} (${data.payment.status}) on ${new Date(data.payment.createdAt).toLocaleString()}`, 'success');
+          const p = data.payment;
+          showMessage(
+            `✅ ${p.paymentMethod} ${p.status} on ${new Date(p.createdAt).toLocaleString()}`,
+            'success'
+          );
         } else {
-          const err = await res.json();
-          showMessage(`❌ ${err.message || 'Not paid'}`);
+          const e = await res.json();
+          showMessage(`❌ ${e.message||'Payment not found'}`);
         }
-      } catch (err) {
-        console.error(err);
-        showMessage('❌ Error checking payment.');
+      } catch (e) {
+        console.error(e);
+        showMessage('❌ Network error checking payment');
       }
     });
 
-    // Initialize
+    // initialize
     window.addEventListener('DOMContentLoaded', loadTrips);
   </script>
 </body>
